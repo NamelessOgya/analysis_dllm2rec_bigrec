@@ -13,3 +13,5 @@ numpy
 pandas
 nbconvert
 ipykernel
+protobuf
+
