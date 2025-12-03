@@ -10,6 +10,7 @@ SEED=${3:-0}
 BATCH_SIZE=${5:-128}
 MICRO_BATCH_SIZE=${6:-4}
 BASE_MODEL=${7:-"Qwen/Qwen2-0.5B"}
+NUM_EPOCHS=${8:-50}
 
 echo "Running BIGRec training for dataset: $DATASET"
 
@@ -34,7 +35,7 @@ CUDA_VISIBLE_DEVICES=$GPU_ID python train.py \
     --output_dir "$OUTPUT_DIR" \
     --batch_size $BATCH_SIZE \
     --micro_batch_size $MICRO_BATCH_SIZE \
-    --num_epochs 50 \
+    --num_epochs $NUM_EPOCHS \
     --learning_rate 1e-4 \
     --cutoff_len 512 \
     --lora_r 8 \

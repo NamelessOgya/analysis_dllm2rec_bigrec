@@ -46,16 +46,16 @@ BIGRec用のデータ前処理を行います。デフォルトは `movie` デ�
 BIGRecモデル（LLM）のFine-tuningを行います。
 
 ```bash
-# 引数: <dataset> <gpu_id> <seed> <sample> <batch_size> <micro_batch_size> <base_model>
-# デフォルト: movie 0 0 1024 128 4 "Qwen/Qwen2-0.5B"
+# 引数: <dataset> <gpu_id> <seed> <sample> <batch_size> <micro_batch_size> <base_model> <num_epochs>
+# デフォルト: movie 0 0 1024 128 4 "Qwen/Qwen2-0.5B" 50
 
 # 例: A100などで高速に学習する場合
-./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B"
+./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B" 50
 
 # 例: 並列実行（GPU 0でQwen, GPU 1でLlama）
 # 出力ディレクトリはモデル名を含むため競合しません
-./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B" &
-./cmd/run_bigrec_train.sh movie 1 0 1024 128 128 "meta-llama/Llama-2-7b-hf" &
+./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B" 50 &
+./cmd/run_bigrec_train.sh movie 1 0 1024 128 128 "meta-llama/Llama-2-7b-hf" 50 &
 ```
 
 ### 4. BIGRecの推論
