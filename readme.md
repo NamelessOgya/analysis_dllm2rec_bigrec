@@ -75,8 +75,15 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 学習したモデルを用いて推論を行い、推薦結果を生成します。
 
 ```bash
-# 引数: <dataset> <gpu_id>
-./cmd/run_bigrec_inference.sh movie 0
+```bash
+# 引数: <dataset> <gpu_id> <base_model> <seed> <sample>
+# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024
+
+# 例: Qwenで推論
+./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B"
+
+# 例: Llamaで推論
+./cmd/run_bigrec_inference.sh movie 0 "meta-llama/Llama-2-7b-hf"
 ```
 
 ### 6. データ転送
