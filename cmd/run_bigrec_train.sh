@@ -7,7 +7,9 @@ set -e
 DATASET=${1:-movie}
 GPU_ID=${2:-0}
 SEED=${3:-0}
-SAMPLE=${4:-1024}
+BATCH_SIZE=${5:-128}
+MICRO_BATCH_SIZE=${6:-4}
+BASE_MODEL=${7:-"Qwen/Qwen2-0.5B"}
 
 echo "Running BIGRec training for dataset: $DATASET"
 
@@ -23,12 +25,12 @@ cd "$BIGREC_DIR"
 # Run training
 # Note: Adjust arguments as needed based on README and requirements
 CUDA_VISIBLE_DEVICES=$GPU_ID python train.py \
-    --base_model "Qwen/Qwen2-0.5B" \
+    --base_model "$BASE_MODEL" \
     --train_data_path "[\"./data/$DATASET/train.json\"]" \
     --val_data_path "[\"./data/$DATASET/valid_5000.json\"]" \
     --output_dir "$OUTPUT_DIR" \
-    --batch_size 128 \
-    --micro_batch_size 4 \
+    --batch_size $BATCH_SIZE \
+    --micro_batch_size $MICRO_BATCH_SIZE \
     --num_epochs 50 \
     --learning_rate 1e-4 \
     --cutoff_len 512 \
