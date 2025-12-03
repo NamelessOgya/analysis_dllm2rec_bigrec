@@ -243,7 +243,7 @@ def train(
             fp16=True,
             logging_steps=8,
             optim="adamw_torch",
-            evaluation_strategy="epoch",
+            eval_strategy="epoch",
             save_strategy="epoch",
             output_dir=output_dir,
             save_total_limit=1,
