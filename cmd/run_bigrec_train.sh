@@ -7,6 +7,7 @@ set -e
 DATASET=${1:-movie}
 GPU_ID=${2:-0}
 SEED=${3:-0}
+SAMPLE=${4:-1024}
 BATCH_SIZE=${5:-128}
 MICRO_BATCH_SIZE=${6:-4}
 BASE_MODEL=${7:-"Qwen/Qwen2-0.5B"}
@@ -19,7 +20,8 @@ SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
 
 # Define paths
 BIGREC_DIR="BIGRec"
-OUTPUT_DIR="./model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+# Use absolute path for output directory to avoid issues when changing directory
+OUTPUT_DIR="$(pwd)/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
