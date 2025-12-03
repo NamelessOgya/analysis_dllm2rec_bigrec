@@ -9,7 +9,7 @@ import torch
 import transformers
 from datasets import load_dataset, concatenate_datasets
 from transformers import EarlyStoppingCallback
-# from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 """
 Unused imports:`
 import torch.nn as nn
@@ -23,7 +23,7 @@ from peft import (  # noqa: E402
     prepare_model_for_int8_training,
     set_peft_model_state_dict,
 )
-from transformers import LlamaForCausalLM, LlamaTokenizer  # noqa: F402
+# from transformers import LlamaForCausalLM, LlamaTokenizer  # noqa: F402
 
 
 def train(
@@ -109,14 +109,14 @@ def train(
     if len(wandb_log_model) > 0:
         os.environ["WANDB_LOG_MODEL"] = wandb_log_model
     os.environ["WANDB_DISABLED"] = "true"
-    model = LlamaForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         base_model,
         load_in_8bit=True,
         torch_dtype=torch.float16,
         device_map=device_map,
     )
     # model.set_tau(tau)
-    tokenizer = LlamaTokenizer.from_pretrained(base_model)
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
 
     tokenizer.pad_token_id = (
         0  # unk. we want this to be different from the eos token
