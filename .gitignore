@@ -13,3 +13,6 @@ BIGRec/data/movie/movies.dat
 BIGRec/data/game/ratings.dat
 BIGRec/data/game/movies.dat
 BIGRec/data/movie_small/
+BIGRec/data/dummy_data/
+test/integration/dummy_models/
+DLLM2Rec/tocf/dummy_data/

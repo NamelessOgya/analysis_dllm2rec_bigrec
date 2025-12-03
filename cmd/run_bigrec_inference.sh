@@ -12,14 +12,19 @@ SAMPLE=${5:-1024}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
-# Define paths
-BIGREC_DIR="BIGRec"
-RESULT_DIR="./${DATASET}_result"
-TEST_DATA_PATH="./data/$DATASET/test_5000.json"
-RESULT_JSON_PATH="$RESULT_DIR/${DATASET}.json"
-
 # Sanitize model name for directory usage (replace / with _)
 SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
+
+# Define paths
+BIGREC_DIR="BIGRec"
+# Output directory structure aligned with training: ./model/<dataset>/<safe_model_name>/<seed>_<sample>
+# But for inference results, we might want to keep them separate or in the same place?
+# The user asked to "separate output file destination by model like cmd/run_bigrec_train.sh".
+# Training script uses: OUTPUT_DIR="./model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+# Let's use a similar structure for results: ./results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}
+RESULT_DIR="./results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+TEST_DATA_PATH="./data/$DATASET/test_5000.json"
+RESULT_JSON_PATH="$RESULT_DIR/test.json"
 
 # Construct LoRA weights path
 # Path format: ./model/<dataset>/<safe_model_name>/<seed>_<sample>
@@ -38,6 +43,7 @@ if [ ! -d "$LORA_WEIGHTS" ]; then
 fi
 
 echo "Using LoRA weights from: $LORA_WEIGHTS"
+echo "Outputting results to: $RESULT_DIR"
 
 # Run inference
 CUDA_VISIBLE_DEVICES=$GPU_ID python inference.py \
@@ -46,4 +52,20 @@ CUDA_VISIBLE_DEVICES=$GPU_ID python inference.py \
     --test_data_path "$TEST_DATA_PATH" \
     --result_json_data "$RESULT_JSON_PATH"
 
-echo "BIGRec inference completed."
+echo "Inference completed. Running evaluation..."
+
+# Run evaluation
+# evaluate.py takes --input_dir and processes all json files in it.
+# We point it to our specific result directory.
+CUDA_VISIBLE_DEVICES=$GPU_ID python "./data/$DATASET/evaluate.py" --input_dir "$RESULT_DIR"
+
+# evaluate.py writes output to ./<dataset>.json (e.g., movie.json) in the current directory.
+# We move it to the result directory to keep things organized.
+if [ -f "./${DATASET}.json" ]; then
+    mv "./${DATASET}.json" "$RESULT_DIR/metrics.json"
+    echo "Evaluation metrics saved to $RESULT_DIR/metrics.json"
+else
+    echo "Warning: Evaluation output file ./${DATASET}.json not found."
+fi
+
+echo "BIGRec inference and evaluation completed."
