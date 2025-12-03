@@ -17,7 +17,7 @@ RATINGS_FILE="$DATA_DIR/ratings.dat"
 if [ -f "$RATINGS_FILE" ]; then
     echo "ratings.dat already exists in $DATA_DIR"
     # We might want to force check if it's the correct one, but for now rely on user to clean up if needed
-    # exit 0
+    exit 0
 fi
 
 echo "Downloading MovieLens 10M dataset..."

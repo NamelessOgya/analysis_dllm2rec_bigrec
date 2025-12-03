@@ -14,9 +14,10 @@ DATA_DIR="$BIGREC_DIR/data/$DATASET"
 NOTEBOOK_PATH="$DATA_DIR/process.ipynb"
 SCRIPT_PATH="$DATA_DIR/process.py"
 
-# Check if notebook exists
-if [ ! -f "$NOTEBOOK_PATH" ]; then
-    echo "Error: Notebook not found at $NOTEBOOK_PATH"
+# Check if python script exists
+SCRIPT_PATH="$DATA_DIR/process.py"
+if [ ! -f "$SCRIPT_PATH" ]; then
+    echo "Error: Python script not found at $SCRIPT_PATH"
     exit 1
 fi
 
