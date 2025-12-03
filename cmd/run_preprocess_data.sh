@@ -20,6 +20,9 @@ if [ ! -f "$NOTEBOOK_PATH" ]; then
     exit 1
 fi
 
+# Ensure data exists
+./cmd/download_data.sh "$DATASET"
+
 echo "Converting notebook to python script..."
 jupyter nbconvert --to python "$NOTEBOOK_PATH"
 
