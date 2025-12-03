@@ -13,9 +13,12 @@ BASE_MODEL=${7:-"Qwen/Qwen2-0.5B"}
 
 echo "Running BIGRec training for dataset: $DATASET"
 
+# Sanitize model name for directory usage (replace / with _)
+SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
+
 # Define paths
 BIGREC_DIR="BIGRec"
-OUTPUT_DIR="./model/$DATASET/${SEED}_${SAMPLE}"
+OUTPUT_DIR="./model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
