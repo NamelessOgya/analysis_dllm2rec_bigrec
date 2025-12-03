@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Exit on error
+set -e
+
+CONTAINER_NAME="dllm2rec_bigrec_container"
+DATASET="movie_small"
+DATA_DIR="BIGRec/data/$DATASET"
+
+echo "Starting integration test for preprocess_data..."
+
+# 1. Ensure container is running
+if ! docker ps | grep -q "$CONTAINER_NAME"; then
+    echo "Container $CONTAINER_NAME is not running. Attempting to start..."
+    ./cmd/start_container.sh
+    # Wait a bit for container to be ready
+    sleep 5
+fi
+
+# 2. Clean up previous outputs to ensure fresh run
+echo "Cleaning up previous outputs..."
+rm -f "$DATA_DIR/train.json" "$DATA_DIR/valid.json" "$DATA_DIR/test.json"
+# We don't remove ratings.dat/movies.dat to avoid re-downloading every time, 
+# but we could if we wanted to test download too. 
+# For now, let's keep data if it exists to save time.
+
+# 3. Run preprocess script inside container
+echo "Running preprocess script in container..."
+docker exec "$CONTAINER_NAME" ./cmd/run_preprocess_data.sh "$DATASET"
+
+# 4. Verify outputs
+echo "Verifying output files..."
+REQUIRED_FILES=("train.json" "valid.json" "test.json" "valid_5000.json" "test_5000.json")
+
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ -f "$DATA_DIR/$file" ]; then
+        echo "[OK] $file exists."
+    else
+        echo "[ERROR] $file is missing!"
+        exit 1
+    fi
+done
+
+echo "Integration test passed!"
