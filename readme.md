@@ -51,6 +51,11 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 
 # 例: A100などで高速に学習する場合
 ./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B"
+
+# 例: 並列実行（GPU 0でQwen, GPU 1でLlama）
+# 出力ディレクトリはモデル名を含むため競合しません
+./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B" &
+./cmd/run_bigrec_train.sh movie 1 0 1024 128 128 "meta-llama/Llama-2-7b-hf" &
 ```
 
 ### 4. BIGRecの推論
