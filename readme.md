@@ -32,7 +32,19 @@ docker exec -it dllm2rec_bigrec_container /bin/bash
 
 **以降の手順は、コンテナ内で実行してください。**
 
-### 2. データ前処理
+### 2. Hugging Faceへのログイン
+
+LlamaなどのGated Modelを使用する場合は、Hugging Faceへのログインが必要です。
+
+```bash
+# トークンを引数で渡す場合
+./cmd/login_huggingface.sh <YOUR_HF_TOKEN>
+
+# 対話的にログインする場合
+./cmd/login_huggingface.sh
+```
+
+### 3. データ前処理
 
 BIGRec用のデータ前処理を行います。デフォルトは `movie` データセットです。
 
@@ -41,7 +53,7 @@ BIGRec用のデータ前処理を行います。デフォルトは `movie` デ�
 ./cmd/run_preprocess_data.sh movie
 ```
 
-### 3. BIGRecの学習
+### 4. BIGRecの学習
 
 BIGRecモデル（LLM）のFine-tuningを行います。
 
@@ -58,7 +70,7 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 ./cmd/run_bigrec_train.sh movie 1 0 1024 128 128 "meta-llama/Llama-2-7b-hf" 50 &
 ```
 
-### 4. BIGRecの推論
+### 5. BIGRecの推論
 
 学習したモデルを用いて推論を行い、推薦結果を生成します。
 
@@ -67,7 +79,7 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 ./cmd/run_bigrec_inference.sh movie 0
 ```
 
-### 5. データ転送
+### 6. データ転送
 
 BIGRecの推論結果（埋め込み表現やランキング情報）をDLLM2Recが利用できる形式で配置します。
 
@@ -76,7 +88,7 @@ BIGRecの推論結果（埋め込み表現やランキング情報）をDLLM2Rec
 ./cmd/transfer_data.sh movie
 ```
 
-### 6. DLLM2Recの学習
+### 7. DLLM2Recの学習
 
 BIGRecの知識を蒸留してSASRecなどの学生モデルを学習させます。
 
