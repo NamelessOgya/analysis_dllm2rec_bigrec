@@ -3,16 +3,13 @@ appdirs
 loralib
 bitsandbytes==0.37.2
 peft==0.3.0
-black
 black[jupyter]
 datasets
 fire
-git+https://github.com/huggingface/peft.git
 transformers>=4.28.0
 sentencepiece
 gradio
 numpy
 pandas
-torch
 nbconvert
 ipykernel
