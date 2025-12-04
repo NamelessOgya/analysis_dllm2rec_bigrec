@@ -148,7 +148,8 @@ def main(
             for i in range(chunk_size):
                 yield list[batch_size * i: batch_size * (i + 1)]
         print("DEBUG: Starting inference loop...")
-        for i, batch in tqdm(enumerate(zip(batch(instructions), batch(inputs)))):
+        total_batches = (len(instructions) - 1) // batch_size + 1
+        for i, batch in tqdm(enumerate(zip(batch(instructions), batch(inputs))), total=total_batches):
             print(f"DEBUG: Processing batch {i}...")
             instructions, inputs = batch
             output = evaluate(instructions, inputs)

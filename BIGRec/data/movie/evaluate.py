@@ -13,13 +13,18 @@ parse.add_argument("--embedding_path", type=str, default=None, help="path to ite
 parse.add_argument("--save_results", action="store_true", help="save ranking results to txt files")
 parse.add_argument("--topk", type=int, default=200, help="topk for saving results")
 args = parse.parse_args()
+print(f"DEBUG: evaluate.py started")
+print(f"DEBUG: Arguments: {args}")
+print(f"DEBUG: Input Directory: {args.input_dir}")
 
 path = []
 for root, dirs, files in os.walk(args.input_dir):
     for name in files:
+        print(f"DEBUG: Checking file: {name}")
         if name.endswith(".json") and "metrics.json" not in name:
+            print(f"DEBUG: Adding file to process: {name}")
             path.append(os.path.join(args.input_dir, name))
-print(path)
+print(f"DEBUG: Files to process: {path}")
 
 base_model = args.base_model
 print(f"DEBUG: Loading tokenizer from {base_model}...")
@@ -67,7 +72,9 @@ for p in path:
     predict_embeddings = []
     from tqdm import tqdm
     print("DEBUG: Starting embedding generation loop...")
-    for i, batch_input in tqdm(enumerate(batch(text, 16))):
+    batch_size = 16
+    total_batches = (len(text) - 1) // batch_size + 1
+    for i, batch_input in tqdm(enumerate(batch(text, batch_size)), total=total_batches):
         input = tokenizer(batch_input, return_tensors="pt", padding=True)
         input_ids = input.input_ids.to(model.device)
         attention_mask = input.attention_mask.to(model.device)
@@ -116,6 +123,7 @@ for p in path:
     result_dict[p]["NDCG"] = NDCG
     result_dict[p]["HR"] = HR
 
+    print(f"DEBUG: save_results flag is: {args.save_results}")
     if args.save_results:
         print(f"DEBUG: Saving ranking results (top {args.topk}) to files...")
         # Save rank (indices)

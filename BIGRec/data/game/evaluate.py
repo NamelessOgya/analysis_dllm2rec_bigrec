@@ -70,7 +70,9 @@ for p in path:
     predict_embeddings = []
     from tqdm import tqdm
     print("DEBUG: Starting embedding generation loop...")
-    for i, batch_input in tqdm(enumerate(batch(text, 16))):
+    batch_size = 16
+    total_batches = (len(text) - 1) // batch_size + 1
+    for i, batch_input in tqdm(enumerate(batch(text, batch_size)), total=total_batches):
         input = tokenizer(batch_input, return_tensors="pt", padding=True)
         input_ids = input.input_ids.to(model.device)
         attention_mask = input.attention_mask.to(model.device)
