@@ -10,8 +10,8 @@ import os
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 os.environ['OMP_NUM_THREADS'] = '1'
 from peft import PeftModel
-from transformers import GenerationConfig,  LlamaTokenizer
-from transformers import LlamaForCausalLM
+from transformers import GenerationConfig, AutoTokenizer
+from transformers import AutoModelForCausalLM
 
 
 if torch.cuda.is_available():
@@ -38,10 +38,10 @@ def main(
         base_model
     ), "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
 
-    tokenizer = LlamaTokenizer.from_pretrained(base_model)
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
     if device == "cuda":
         print("DEBUG: Loading base model (cuda)...")
-        model = LlamaForCausalLM.from_pretrained(
+        model = AutoModelForCausalLM.from_pretrained(
             base_model,
             load_in_8bit=load_8bit,
             torch_dtype=torch.float16,
@@ -56,7 +56,8 @@ def main(
         )
         print("DEBUG: PeftModel loaded.")
     elif device == "mps":
-        model = LlamaForCausalLM.from_pretrained(
+        print("DEBUG: Loading base model (mps)...")
+        model = AutoModelForCausalLM.from_pretrained(
             base_model,
             device_map={"": device},
             torch_dtype=torch.float16,
@@ -68,7 +69,8 @@ def main(
             torch_dtype=torch.float16,
         )
     else:
-        model = LlamaForCausalLM.from_pretrained(
+        print("DEBUG: Loading base model (cpu)...")
+        model = AutoModelForCausalLM.from_pretrained(
             base_model, device_map={"": device}, low_cpu_mem_usage=True
         )
         model = PeftModel.from_pretrained(

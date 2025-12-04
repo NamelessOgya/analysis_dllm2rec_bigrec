@@ -1,4 +1,4 @@
-from transformers import GenerationConfig, LlamaForCausalLM, LlamaTokenizer
+from transformers import GenerationConfig, AutoModelForCausalLM, AutoTokenizer
 import transformers
 import torch
 import os
@@ -28,9 +28,9 @@ print(f"DEBUG: Files to process: {path}")
 
 base_model = args.base_model
 print(f"DEBUG: Loading tokenizer from {base_model}...")
-tokenizer = LlamaTokenizer.from_pretrained(base_model)
+tokenizer = AutoTokenizer.from_pretrained(base_model)
 print("DEBUG: Tokenizer loaded. Loading model...")
-model = LlamaForCausalLM.from_pretrained(
+model = AutoModelForCausalLM.from_pretrained(
     base_model,
     torch_dtype=torch.float16,
     device_map="auto",

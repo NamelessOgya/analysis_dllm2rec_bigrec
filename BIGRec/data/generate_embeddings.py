@@ -1,7 +1,7 @@
 import argparse
 import os
 import torch
-from transformers import LlamaTokenizer, LlamaForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from tqdm import tqdm
 
 def parse_args():
@@ -59,10 +59,10 @@ def main():
     
     # Load model and tokenizer
     print("Loading model and tokenizer...")
-    tokenizer = LlamaTokenizer.from_pretrained(args.base_model)
+    tokenizer = AutoTokenizer.from_pretrained(args.base_model)
     tokenizer.padding_side = "left"
     
-    model = LlamaForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         args.base_model,
         torch_dtype=torch.float16,
         device_map="auto",

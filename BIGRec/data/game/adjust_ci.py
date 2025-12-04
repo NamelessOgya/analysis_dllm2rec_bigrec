@@ -1,4 +1,4 @@
-from transformers import GenerationConfig, LlamaForCausalLM, LlamaTokenizer
+from transformers import GenerationConfig, AutoModelForCausalLM, AutoTokenizer
 import transformers
 import torch
 import os
@@ -17,8 +17,8 @@ for root, dirs, files in os.walk(args.input_dir):
 print(path)
 
 base_model = "YOUR_LLAMA_PATH"
-tokenizer = LlamaTokenizer.from_pretrained(base_model)
-model = LlamaForCausalLM.from_pretrained(
+tokenizer = AutoTokenizer.from_pretrained(base_model)
+model = AutoModelForCausalLM.from_pretrained(
     base_model,
     torch_dtype=torch.float16,
     device_map="auto",
