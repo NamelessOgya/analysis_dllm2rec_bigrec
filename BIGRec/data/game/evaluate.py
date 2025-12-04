@@ -12,6 +12,7 @@ parse.add_argument("--base_model", type=str, default="Qwen/Qwen2-0.5B", help="ba
 parse.add_argument("--embedding_path", type=str, default=None, help="path to item embeddings")
 parse.add_argument("--save_results", action="store_true", help="save ranking results to txt files")
 parse.add_argument("--topk", type=int, default=200, help="topk for saving results")
+parse.add_argument("--batch_size", type=int, default=16, help="batch size for embedding generation")
 args = parse.parse_args()
 
 path = []
@@ -70,7 +71,7 @@ for p in path:
     predict_embeddings = []
     from tqdm import tqdm
     print("DEBUG: Starting embedding generation loop...")
-    batch_size = 16
+    batch_size = args.batch_size
     total_batches = (len(text) - 1) // batch_size + 1
     for i, batch_input in tqdm(enumerate(batch(text, batch_size)), total=total_batches):
         input = tokenizer(batch_input, return_tensors="pt", padding=True)

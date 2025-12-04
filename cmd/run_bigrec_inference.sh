@@ -11,6 +11,7 @@ SEED=${4:-0}
 SAMPLE=${5:-1024}
 SKIP_INFERENCE=${6:-false}
 TEST_DATA=${7:-"test_5000.json"}
+BATCH_SIZE=${8:-16}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
@@ -95,7 +96,8 @@ CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
     --input_dir "$RESULT_DIR" \
     --base_model "$BASE_MODEL" \
     --embedding_path "$EMBEDDING_FILE" \
-    --save_results
+    --save_results \
+    --batch_size "$BATCH_SIZE"
 
 # evaluate.py writes output to ./<dataset>.json (e.g., movie.json) in the current directory.
 # Since we are in root, it will be ./movie.json
