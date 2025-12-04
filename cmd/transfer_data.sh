@@ -5,11 +5,13 @@ set -e
 
 # Arguments
 DATASET=${1:-movie}
-BASE_MODEL=${2:-"Qwen/Qwen2-0.5B"}
-SEED=${3:-0}
-SAMPLE=${4:-1024}
+GPU_ID=${2:-0}
+BASE_MODEL=${3:-"Qwen/Qwen2-0.5B"}
+SEED=${4:-0}
+SAMPLE=${5:-1024}
 
 echo "Transferring data for dataset: $DATASET"
+echo "GPU ID: $GPU_ID"
 echo "Base Model: $BASE_MODEL"
 echo "Seed: $SEED"
 echo "Sample: $SAMPLE"
