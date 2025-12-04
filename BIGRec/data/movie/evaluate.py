@@ -18,12 +18,15 @@ for root, dirs, files in os.walk(args.input_dir):
 print(path)
 
 base_model = args.base_model
+print(f"DEBUG: Loading tokenizer from {base_model}...")
 tokenizer = LlamaTokenizer.from_pretrained(base_model)
+print("DEBUG: Tokenizer loaded. Loading model...")
 model = LlamaForCausalLM.from_pretrained(
     base_model,
     torch_dtype=torch.float16,
     device_map="auto",
 )
+print("DEBUG: Model loaded.")
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 f = open(os.path.join(script_dir, 'movies.dat'), 'r', encoding='ISO-8859-1')
