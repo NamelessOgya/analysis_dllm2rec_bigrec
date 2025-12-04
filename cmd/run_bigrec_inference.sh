@@ -25,7 +25,7 @@ BIGREC_DIR="BIGRec"
 # Let's use a similar structure for results: ./results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}
 RESULT_DIR="./results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 # TEST_DATA_PATH needs to be absolute or relative to BIGREC_DIR after cd
-TEST_DATA_PATH="../data/$DATASET/test_5000.json"
+TEST_DATA_PATH="./data/$DATASET/test_5000.json"
 RESULT_JSON_PATH="$RESULT_DIR/test.json"
 
 # Construct LoRA weights path
@@ -63,7 +63,7 @@ echo "Inference completed (or skipped). Running evaluation..."
 # Run evaluation
 # evaluate.py takes --input_dir and processes all json files in it.
 # We point it to our specific result directory.
-CUDA_VISIBLE_DEVICES=$GPU_ID python "../data/$DATASET/evaluate.py" --input_dir "$RESULT_DIR" --base_model "$BASE_MODEL"
+CUDA_VISIBLE_DEVICES=$GPU_ID python "./data/$DATASET/evaluate.py" --input_dir "$RESULT_DIR" --base_model "$BASE_MODEL"
 
 # evaluate.py writes output to ./<dataset>.json (e.g., movie.json) in the current directory.
 # We move it to the result directory to keep things organized.
