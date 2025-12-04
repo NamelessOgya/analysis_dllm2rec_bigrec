@@ -87,7 +87,8 @@ def main(
 
     model.eval()
     if torch.__version__ >= "2" and sys.platform != "win32":
-        model = torch.compile(model)
+        # model = torch.compile(model)
+        pass
 
     def evaluate(
         instructions,
