@@ -56,6 +56,24 @@ def main(
 
     # Sampling parameters
     # Matching original script: num_beams=4, num_return_sequences=4
+    # Load test data
+    with open(test_data_path, 'r') as f:
+        print(f"DEBUG: Loading test data from {test_data_path}...")
+        test_data = json.load(f)
+        print(f"DEBUG: Loaded {len(test_data)} items.")
+
+    prompts = []
+    for item in test_data:
+        instruction = item['instruction']
+        input_text = item['input']
+        prompts.append(generate_prompt(instruction, input_text))
+    
+    lora_request = None
+    if enable_lora:
+        # Name can be anything unique
+        lora_request = LoRARequest("bigrec_adapter", 1, lora_weights)
+        print(f"DEBUG: Using LoRA adapter from {lora_weights}")
+
     # vLLM 0.12.0 has a dedicated beam_search method in LLM class.
     # We use that for beam search, and generate() for sampling.
     
