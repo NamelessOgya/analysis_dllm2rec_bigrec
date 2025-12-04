@@ -56,30 +56,26 @@ def main(
 
     # Sampling parameters
     # Matching original script: num_beams=4, num_return_sequences=4
-    # Try to use BeamSearchParams for beam search if num_beams > 1
+    # vLLM 0.12.0 has a dedicated beam_search method in LLM class.
+    # We use that for beam search, and generate() for sampling.
+    
     if num_beams > 1:
-        try:
-            from vllm.sampling_params import BeamSearchParams
-            print(f"DEBUG: Using BeamSearchParams with beam_width={num_beams}")
-            sampling_params = BeamSearchParams(
-                beam_width=num_beams,
-                max_tokens=max_new_tokens,
-                temperature=temperature,
-                # length_penalty=1.0, # Default
-            )
-            # WORKAROUND: vLLM 0.12.0 LLM class expects truncate_prompt_tokens, but BeamSearchParams doesn't have it.
-            sampling_params.truncate_prompt_tokens = None
-        except ImportError:
-            print("DEBUG: BeamSearchParams not found. Fallback to random sampling.")
-            if temperature == 0:
-                temperature = 0.7
-            sampling_params = SamplingParams(
-                temperature=temperature,
-                top_p=top_p,
-                top_k=top_k,
-                max_tokens=max_new_tokens,
-                n=num_beams,
-            )
+        from vllm.sampling_params import BeamSearchParams
+        print(f"DEBUG: Using BeamSearchParams with beam_width={num_beams}")
+        beam_params = BeamSearchParams(
+            beam_width=num_beams,
+            max_tokens=max_new_tokens,
+            temperature=temperature,
+        )
+        
+        print(f"DEBUG: Starting beam search for {len(prompts)} prompts...")
+        outputs = llm.beam_search(prompts, beam_params, lora_request=lora_request)
+        
+        for i, output in enumerate(outputs):
+            # output is BeamSearchOutput, has sequences: list[BeamSearchSequence]
+            generated_texts = [seq.text for seq in output.sequences]
+            test_data[i]['predict'] = generated_texts
+            
     else:
         sampling_params = SamplingParams(
             temperature=temperature,
@@ -88,40 +84,16 @@ def main(
             max_tokens=max_new_tokens,
             n=num_beams,
         )
+        
+        print(f"DEBUG: Starting generation for {len(prompts)} prompts...")
+        outputs = llm.generate(prompts, sampling_params, lora_request=lora_request)
+        
+        for i, output in enumerate(outputs):
+            # output is RequestOutput, has outputs: list[CompletionOutput]
+            generated_texts = [o.text for o in output.outputs]
+            test_data[i]['predict'] = generated_texts
 
-    # Load test data
-    with open(test_data_path, 'r') as f:
-        print(f"DEBUG: Loading test data from {test_data_path}...")
-        test_data = json.load(f)
-        print(f"DEBUG: Loaded {len(test_data)} items.")
-
-    prompts = []
-    for item in test_data:
-        instruction = item['instruction']
-        input_text = item['input']
-        prompts.append(generate_prompt(instruction, input_text))
-
-    print(f"DEBUG: Starting generation for {len(prompts)} prompts...")
-    
-    lora_request = None
-    if enable_lora:
-        # Name can be anything unique
-        lora_request = LoRARequest("bigrec_adapter", 1, lora_weights)
-        print(f"DEBUG: Using LoRA adapter from {lora_weights}")
-
-    outputs = llm.generate(prompts, sampling_params, lora_request=lora_request)
     print("DEBUG: Generation complete.")
-
-    # Process outputs
-    # Original script output format: list of lists of strings?
-    # No, original script:
-    # real_outputs = [output[i * num_beams: (i + 1) * num_beams] for i in range(len(output) // num_beams)]
-    # test_data[i]['predict'] = outputs[i] -> so 'predict' is a list of strings (candidates)
-    
-    for i, output in enumerate(outputs):
-        # output.outputs is a list of CompletionOutput
-        generated_texts = [o.text for o in output.outputs]
-        test_data[i]['predict'] = generated_texts
 
     with open(result_json_data, 'w') as f:
         json.dump(test_data, f, indent=4)
