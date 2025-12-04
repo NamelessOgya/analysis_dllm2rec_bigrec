@@ -101,7 +101,9 @@ def main(
         **kwargs,
     ):
         prompt = [generate_prompt(instruction, input) for instruction, input in zip(instructions, inputs)]
+        print(f"DEBUG: Tokenizing batch of size {len(prompt)}...")
         inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to(device)
+        print("DEBUG: Tokenization complete. Starting generation...")
         generation_config = GenerationConfig(
             temperature=temperature,
             top_p=top_p,
@@ -118,6 +120,7 @@ def main(
                 output_scores=True,
                 max_new_tokens=max_new_tokens,
             )
+        print("DEBUG: Generation complete.")
         s = generation_output.sequences
         output = tokenizer.batch_decode(s, skip_special_tokens=True)
         output = [_.split('Response:\n')[-1] for _ in output]
