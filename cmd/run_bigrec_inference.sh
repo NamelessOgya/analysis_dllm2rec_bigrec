@@ -84,7 +84,8 @@ else
         --base_model "$BASE_MODEL" \
         --lora_weights "$LORA_WEIGHTS" \
         --test_data_path "$TEST_DATA_PATH" \
-        --result_json_data "$RESULT_JSON_PATH"
+        --result_json_data "$RESULT_JSON_PATH" \
+        --batch_size "$BATCH_SIZE"
 fi
 
 echo "Inference completed (or skipped). Running evaluation..."
