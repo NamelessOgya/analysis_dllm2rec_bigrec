@@ -49,8 +49,11 @@ LlamaなどのGated Modelを使用する場合は、Hugging Faceへのログイ�
 BIGRec用のデータ前処理を行います。デフォルトは `movie` データセットです。
 
 ```bash
-# データセットを指定する場合: ./cmd/run_preprocess_data.sh <dataset_name>
-./cmd/run_preprocess_data.sh movie
+# Movieデータセット（MovieLens 10M）を使用する場合
+./cmd/run_preprocess_movie.sh
+
+# Gameデータセット（Amazon Video Games）を使用する場合
+./cmd/run_preprocess_game.sh
 ```
 
 ### 4. BIGRecの学習
