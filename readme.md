@@ -76,11 +76,15 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 
 ```bash
 ```bash
-# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference>
-# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false
+```bash
+# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <test_data>
+# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json"
 
-# 例: Qwenで推論と評価を実行
+# 例: Qwenで推論と評価を実行（テストデータ: test_5000.json）
 ./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B"
+
+# 例: 学習データ(train.json)に対して推論を実行し、DLLM2Rec転送用データを生成
+./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false train.json
 
 # 例: 推論をスキップして評価のみ実行（推論結果が既にある場合）
 ./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 true
