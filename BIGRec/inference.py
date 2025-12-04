@@ -131,14 +131,18 @@ def main(
     outputs = []
     from tqdm import tqdm
     with open(test_data_path, 'r') as f:
+        print(f"DEBUG: Loading test data from {test_data_path}...")
         test_data = json.load(f)
+        print(f"DEBUG: Loaded {len(test_data)} items.")
         instructions = [_['instruction'] for _ in test_data]
         inputs = [_['input'] for _ in test_data]
         def batch(list, batch_size=batch_size):
             chunk_size = (len(list) - 1) // batch_size + 1
             for i in range(chunk_size):
                 yield list[batch_size * i: batch_size * (i + 1)]
+        print("DEBUG: Starting inference loop...")
         for i, batch in tqdm(enumerate(zip(batch(instructions), batch(inputs)))):
+            print(f"DEBUG: Processing batch {i}...")
             instructions, inputs = batch
             output = evaluate(instructions, inputs)
             outputs = outputs + output
