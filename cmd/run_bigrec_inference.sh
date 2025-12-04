@@ -10,6 +10,7 @@ BASE_MODEL=${3:-"Qwen/Qwen2-0.5B"}
 SEED=${4:-0}
 SAMPLE=${5:-1024}
 SKIP_INFERENCE=${6:-false}
+TEST_DATA=${7:-"test_5000.json"}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
@@ -24,9 +25,11 @@ BIGREC_DIR="BIGRec"
 # Training script uses: OUTPUT_DIR="./model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 # Let's use a similar structure for results: ./results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}
 RESULT_DIR="BIGRec/results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
-# TEST_DATA_PATH relative to root
-TEST_DATA_PATH="BIGRec/data/$DATASET/test_5000.json"
-RESULT_JSON_PATH="$RESULT_DIR/test.json"
+# Define paths
+# Use root-relative paths
+DATA_DIR="BIGRec/data/$DATASET"
+TEST_DATA_PATH="$DATA_DIR/$TEST_DATA"
+RESULT_JSON_PATH="$RESULT_DIR/$TEST_DATA"
 
 # Construct LoRA weights path
 # Path format: ./model/<dataset>/<safe_model_name>/<seed>_<sample>
@@ -91,7 +94,8 @@ echo "Inference completed (or skipped). Running evaluation..."
 CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
     --input_dir "$RESULT_DIR" \
     --base_model "$BASE_MODEL" \
-    --embedding_path "$EMBEDDING_FILE"
+    --embedding_path "$EMBEDDING_FILE" \
+    --save_results
 
 # evaluate.py writes output to ./<dataset>.json (e.g., movie.json) in the current directory.
 # Since we are in root, it will be ./movie.json

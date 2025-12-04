@@ -10,6 +10,8 @@ parse = argparse.ArgumentParser()
 parse.add_argument("--input_dir",type=str, default="./", help="your model directory")
 parse.add_argument("--base_model", type=str, default="Qwen/Qwen2-0.5B", help="base model path")
 parse.add_argument("--embedding_path", type=str, default=None, help="path to item embeddings")
+parse.add_argument("--save_results", action="store_true", help="save ranking results to txt files")
+parse.add_argument("--topk", type=int, default=200, help="topk for saving results")
 args = parse.parse_args()
 
 path = []
@@ -114,5 +116,27 @@ for p in path:
     print('_' * 100)
     result_dict[p]["NDCG"] = NDCG
     result_dict[p]["HR"] = HR
+
+    if args.save_results:
+        print(f"DEBUG: Saving ranking results (top {args.topk}) to files...")
+        sorted_indices = dist.argsort(dim=-1)
+        topk_indices = sorted_indices[:, :args.topk]
+        
+        base_name = os.path.splitext(p)[0]
+        rank_file = f"{base_name}_rank.txt"
+        with open(rank_file, 'w') as f_rank:
+            for row in topk_indices:
+                line = ' '.join(map(str, row.tolist()))
+                f_rank.write(line + '\n')
+        print(f"Saved rank to {rank_file}")
+        
+        topk_values = torch.gather(dist, 1, topk_indices)
+        score_file = f"{base_name}_score.txt"
+        with open(score_file, 'w') as f_score:
+            for row in topk_values:
+                line = ' '.join(map(str, row.tolist()))
+                f_score.write(line + '\n')
+        print(f"Saved scores to {score_file}")
+
 f = open('./game.json', 'w')    
 json.dump(result_dict, f, indent=4)
