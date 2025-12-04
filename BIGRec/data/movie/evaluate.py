@@ -9,6 +9,7 @@ import argparse
 parse = argparse.ArgumentParser()
 parse.add_argument("--input_dir",type=str, default="./", help="your model directory")
 parse.add_argument("--base_model", type=str, default="Qwen/Qwen2-0.5B", help="base model path")
+parse.add_argument("--embedding_path", type=str, default=None, help="path to item embeddings")
 args = parse.parse_args()
 
 path = []
@@ -72,7 +73,13 @@ for p in path:
         predict_embeddings.append(hidden_states[-1][:, -1, :].detach().cpu())
     
     predict_embeddings = torch.cat(predict_embeddings, dim=0).cuda()
-    movie_embedding = torch.load(os.path.join(script_dir, "movie_embedding.pt")).cuda()
+    if args.embedding_path:
+        embedding_file = args.embedding_path
+    else:
+        embedding_file = os.path.join(script_dir, "movie_embedding.pt")
+    
+    print(f"DEBUG: Loading item embeddings from {embedding_file}...")
+    movie_embedding = torch.load(embedding_file).cuda()
     dist = torch.cdist(predict_embeddings, movie_embedding, p=2)
         
     

@@ -52,6 +52,26 @@ fi
 echo "Using LoRA weights from: $LORA_WEIGHTS"
 echo "Outputting results to: $RESULT_DIR"
 
+# Check if item embedding file exists
+# Use model-specific embedding file to avoid conflicts
+EMBEDDING_DIR="BIGRec/data/$DATASET/model_embeddings"
+EMBEDDING_FILE="$EMBEDDING_DIR/${SAFE_MODEL_NAME}.pt"
+
+if [ ! -f "$EMBEDDING_FILE" ]; then
+    echo "Item embedding file not found at $EMBEDDING_FILE"
+    echo "Generating item embeddings..."
+    CUDA_VISIBLE_DEVICES=$GPU_ID python BIGRec/data/generate_embeddings.py \
+        --dataset "$DATASET" \
+        --base_model "$BASE_MODEL" \
+        --output_path "$EMBEDDING_FILE"
+    
+    if [ ! -f "$EMBEDDING_FILE" ]; then
+        echo "Error: Failed to generate item embeddings."
+        exit 1
+    fi
+    echo "Item embeddings generated successfully."
+fi
+
 # Run inference
 if [ "$SKIP_INFERENCE" = "true" ]; then
     echo "Skipping inference step as requested."
@@ -68,7 +88,10 @@ echo "Inference completed (or skipped). Running evaluation..."
 # Run evaluation
 # evaluate.py takes --input_dir and processes all json files in it.
 # We point it to our specific result directory.
-CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" --input_dir "$RESULT_DIR" --base_model "$BASE_MODEL"
+CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
+    --input_dir "$RESULT_DIR" \
+    --base_model "$BASE_MODEL" \
+    --embedding_path "$EMBEDDING_FILE"
 
 # evaluate.py writes output to ./<dataset>.json (e.g., movie.json) in the current directory.
 # Since we are in root, it will be ./movie.json

@@ -18,6 +18,10 @@ cp "$(pwd)/cmd/run_bigrec_inference.sh" "$WORKSPACE/cmd/"
 touch "$WORKSPACE/BIGRec/inference.py"
 touch "$WORKSPACE/BIGRec/data/movie/evaluate.py"
 
+# Create dummy test data
+mkdir -p "$WORKSPACE/BIGRec/data/movie"
+echo '[{"instruction": "test", "input": "test", "output": "test"}]' > "$WORKSPACE/BIGRec/data/movie/test_5000.json"
+
 # Create mock python
 cat << 'EOF' > "$WORKSPACE/mock_python"
 #!/bin/bash
@@ -82,6 +86,10 @@ ln -s "$WORKSPACE/mock_python" "$WORKSPACE/python"
 
 # Execute the script
 echo "Executing: ./cmd/run_bigrec_inference.sh movie 0 \"Qwen/Qwen2-0.5B\" 0 1024"
+# Create dummy embedding file to avoid generation step in test
+mkdir -p "BIGRec/data/movie/model_embeddings"
+touch "BIGRec/data/movie/model_embeddings/Qwen_Qwen2-0.5B.pt"
+
 ./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024
 
 # Verify results
