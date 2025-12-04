@@ -17,6 +17,7 @@ args = parse.parse_args()
 path = []
 for root, dirs, files in os.walk(args.input_dir):
     for name in files:
+        if name.endswith(".json") and "metrics.json" not in name:
             path.append(os.path.join(args.input_dir, name))
 print(path)
 
