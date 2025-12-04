@@ -92,8 +92,11 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 BIGRecの推論結果（埋め込み表現やランキング情報）をDLLM2Recが利用できる形式で配置します。
 
 ```bash
-# 引数: <dataset>
-./cmd/transfer_data.sh movie
+# 引数: <dataset> <base_model> <seed> <sample>
+# デフォルト: movie "Qwen/Qwen2-0.5B" 0 1024
+
+# 例: Qwenモデルの結果を転送
+./cmd/transfer_data.sh movie "Qwen/Qwen2-0.5B"
 ```
 
 ### 7. DLLM2Recの学習
