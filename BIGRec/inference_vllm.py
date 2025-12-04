@@ -87,7 +87,10 @@ def main(
         )
         
         print(f"DEBUG: Starting beam search for {len(prompts)} prompts...")
-        outputs = llm.beam_search(prompts, beam_params, lora_request=lora_request)
+        # LLM.beam_search expects TextPrompt (dict) or TokensPrompt, not raw strings.
+        # We wrap strings into TextPrompt dicts.
+        beam_prompts = [{"prompt": p} for p in prompts]
+        outputs = llm.beam_search(beam_prompts, beam_params, lora_request=lora_request)
         
         for i, output in enumerate(outputs):
             # output is BeamSearchOutput, has sequences: list[BeamSearchSequence]
