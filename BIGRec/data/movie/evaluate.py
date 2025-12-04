@@ -65,8 +65,8 @@ for p in path:
     print("DEBUG: Starting embedding generation loop...")
     for i, batch_input in tqdm(enumerate(batch(text, 16))):
         input = tokenizer(batch_input, return_tensors="pt", padding=True)
-        input_ids = input.input_ids
-        attention_mask = input.attention_mask
+        input_ids = input.input_ids.to(model.device)
+        attention_mask = input.attention_mask.to(model.device)
         outputs = model(input_ids, attention_mask=attention_mask, output_hidden_states=True)
         hidden_states = outputs.hidden_states
         predict_embeddings.append(hidden_states[-1][:, -1, :].detach().cpu())
