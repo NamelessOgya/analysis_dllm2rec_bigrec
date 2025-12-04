@@ -40,18 +40,21 @@ def main(
 
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
     if device == "cuda":
+        print("DEBUG: Loading base model (cuda)...")
         model = LlamaForCausalLM.from_pretrained(
             base_model,
             load_in_8bit=load_8bit,
             torch_dtype=torch.float16,
             device_map="auto",
         )
+        print("DEBUG: Base model loaded. Loading PeftModel...")
         model = PeftModel.from_pretrained(
             model,
             lora_weights,
             torch_dtype=torch.float16,
             device_map={'': 0}
         )
+        print("DEBUG: PeftModel loaded.")
     elif device == "mps":
         model = LlamaForCausalLM.from_pretrained(
             base_model,
@@ -83,9 +86,13 @@ def main(
     model.config.eos_token_id = 2
 
     if not load_8bit:
+        print("DEBUG: Converting model to half precision...")
         model.half()  # seems to fix bugs for some users.
+        print("DEBUG: Model converted to half precision.")
 
+    print("DEBUG: Setting model to eval mode...")
     model.eval()
+    print("DEBUG: Model set to eval mode.")
     if torch.__version__ >= "2" and sys.platform != "win32":
         # model = torch.compile(model)
         pass

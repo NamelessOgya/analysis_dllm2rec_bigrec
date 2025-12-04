@@ -42,6 +42,13 @@ if [ ! -d "$LORA_WEIGHTS" ]; then
     exit 1
 fi
 
+# Check if test data exists
+if [ ! -f "$TEST_DATA_PATH" ]; then
+    echo "Error: Test data not found at $TEST_DATA_PATH"
+    echo "Please run data preprocessing first (e.g., ./cmd/run_preprocess_data.sh $DATASET)."
+    exit 1
+fi
+
 echo "Using LoRA weights from: $LORA_WEIGHTS"
 echo "Outputting results to: $RESULT_DIR"
 
