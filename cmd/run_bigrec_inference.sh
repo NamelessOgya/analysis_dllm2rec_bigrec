@@ -9,6 +9,7 @@ GPU_ID=${2:-0}
 BASE_MODEL=${3:-"Qwen/Qwen2-0.5B"}
 SEED=${4:-0}
 SAMPLE=${5:-1024}
+SKIP_INFERENCE=${6:-false}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
@@ -23,7 +24,8 @@ BIGREC_DIR="BIGRec"
 # Training script uses: OUTPUT_DIR="./model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 # Let's use a similar structure for results: ./results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}
 RESULT_DIR="./results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
-TEST_DATA_PATH="./data/$DATASET/test_5000.json"
+# TEST_DATA_PATH needs to be absolute or relative to BIGREC_DIR after cd
+TEST_DATA_PATH="../data/$DATASET/test_5000.json"
 RESULT_JSON_PATH="$RESULT_DIR/test.json"
 
 # Construct LoRA weights path
@@ -46,18 +48,22 @@ echo "Using LoRA weights from: $LORA_WEIGHTS"
 echo "Outputting results to: $RESULT_DIR"
 
 # Run inference
-CUDA_VISIBLE_DEVICES=$GPU_ID python inference.py \
-    --base_model "$BASE_MODEL" \
-    --lora_weights "$LORA_WEIGHTS" \
-    --test_data_path "$TEST_DATA_PATH" \
-    --result_json_data "$RESULT_JSON_PATH"
+if [ "$SKIP_INFERENCE" = "true" ]; then
+    echo "Skipping inference step as requested."
+else
+    CUDA_VISIBLE_DEVICES=$GPU_ID python inference.py \
+        --base_model "$BASE_MODEL" \
+        --lora_weights "$LORA_WEIGHTS" \
+        --test_data_path "$TEST_DATA_PATH" \
+        --result_json_data "$RESULT_JSON_PATH"
+fi
 
-echo "Inference completed. Running evaluation..."
+echo "Inference completed (or skipped). Running evaluation..."
 
 # Run evaluation
 # evaluate.py takes --input_dir and processes all json files in it.
 # We point it to our specific result directory.
-CUDA_VISIBLE_DEVICES=$GPU_ID python "./data/$DATASET/evaluate.py" --input_dir "$RESULT_DIR"
+CUDA_VISIBLE_DEVICES=$GPU_ID python "../data/$DATASET/evaluate.py" --input_dir "$RESULT_DIR" --base_model "$BASE_MODEL"
 
 # evaluate.py writes output to ./<dataset>.json (e.g., movie.json) in the current directory.
 # We move it to the result directory to keep things organized.

@@ -16,3 +16,5 @@ BIGRec/data/movie_small/
 BIGRec/data/dummy_data/
 test/integration/dummy_models/
 DLLM2Rec/tocf/dummy_data/
+BIGRec/model/
+BIGRec/data/*/*.json

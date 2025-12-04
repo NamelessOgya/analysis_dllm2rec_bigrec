@@ -21,7 +21,7 @@ SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
 # Define paths
 BIGREC_DIR="BIGRec"
 # Use absolute path for output directory to avoid issues when changing directory
-OUTPUT_DIR="$(pwd)/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+OUTPUT_DIR="$(pwd)/BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"

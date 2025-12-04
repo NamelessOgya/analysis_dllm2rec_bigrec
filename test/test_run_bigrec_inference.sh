@@ -45,6 +45,22 @@ fi
 
 # Simulate evaluate output
 if [[ "$@" == *"evaluate.py"* ]]; then
+    # Check for base_model argument
+    BASE_MODEL_ARG=""
+    prev=""
+    for arg in "$@"; do
+        if [[ "$prev" == "--base_model" ]]; then
+            BASE_MODEL_ARG="$arg"
+        fi
+        prev="$arg"
+    done
+
+    if [ -z "$BASE_MODEL_ARG" ]; then
+        echo "Error: --base_model argument missing in evaluate.py call"
+        exit 1
+    fi
+    echo "evaluate.py called with base_model: $BASE_MODEL_ARG"
+
     # evaluate.py writes to ./movie.json (based on dataset name usually)
     # The script expects ./movie.json (or whatever dataset name is)
     # We need to know the dataset name. It's not passed to evaluate.py directly as arg in the script call 
@@ -85,3 +101,23 @@ else
 fi
 
 echo "Test Passed!"
+
+# Test Case 2: Skip Inference
+echo "Executing Test Case 2: Skip Inference"
+# Remove previous results
+rm -rf "$WORKSPACE/BIGRec/results"
+# Re-create dummy inference output manually because inference.py will be skipped but evaluate.py needs it
+mkdir -p "$WORKSPACE/$EXPECTED_RESULT_DIR"
+echo '[]' > "$WORKSPACE/$EXPECTED_RESULT_DIR/test.json"
+
+./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 true
+
+# Verify results
+if [ -f "$EXPECTED_RESULT_DIR/metrics.json" ]; then
+    echo "SUCCESS: Evaluation metrics found at $EXPECTED_RESULT_DIR/metrics.json (Skip Inference)"
+else
+    echo "FAILURE: Evaluation metrics NOT found at $EXPECTED_RESULT_DIR/metrics.json (Skip Inference)"
+    exit 1
+fi
+
+echo "Test Case 2 Passed!"

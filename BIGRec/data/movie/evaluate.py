@@ -8,6 +8,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import argparse
 parse = argparse.ArgumentParser()
 parse.add_argument("--input_dir",type=str, default="./", help="your model directory")
+parse.add_argument("--base_model", type=str, default="Qwen/Qwen2-0.5B", help="base model path")
 args = parse.parse_args()
 
 path = []
@@ -16,7 +17,7 @@ for root, dirs, files in os.walk(args.input_dir):
             path.append(os.path.join(args.input_dir, name))
 print(path)
 
-base_model = "YOUR_LLAMA_PATH"
+base_model = args.base_model
 tokenizer = LlamaTokenizer.from_pretrained(base_model)
 model = LlamaForCausalLM.from_pretrained(
     base_model,

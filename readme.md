@@ -76,15 +76,16 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 
 ```bash
 ```bash
-# 引数: <dataset> <gpu_id> <base_model> <seed> <sample>
-# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024
+# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference>
+# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false
 
-# 例: Qwenで推論
+# 例: Qwenで推論と評価を実行
 ./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B"
 
-# 例: Llamaで推論
-./cmd/run_bigrec_inference.sh movie 0 "meta-llama/Llama-2-7b-hf"
+# 例: 推論をスキップして評価のみ実行（推論結果が既にある場合）
+./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 true
 ```
+※ 推論完了後、自動的に評価スクリプト (`evaluate.py`) が実行され、結果は `BIGRec/results/...` に保存されます。
 
 ### 6. データ転送
 
