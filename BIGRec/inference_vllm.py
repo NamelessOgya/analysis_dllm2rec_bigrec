@@ -67,6 +67,8 @@ def main(
                 temperature=temperature,
                 # length_penalty=1.0, # Default
             )
+            # WORKAROUND: vLLM 0.12.0 LLM class expects truncate_prompt_tokens, but BeamSearchParams doesn't have it.
+            sampling_params.truncate_prompt_tokens = None
         except ImportError:
             print("DEBUG: BeamSearchParams not found. Fallback to random sampling.")
             if temperature == 0:
