@@ -56,15 +56,36 @@ def main(
 
     # Sampling parameters
     # Matching original script: num_beams=4, num_return_sequences=4
-    sampling_params = SamplingParams(
-        temperature=temperature,
-        top_p=top_p,
-        top_k=top_k,
-        max_tokens=max_new_tokens,
-        use_beam_search=(num_beams > 1),
-        best_of=num_beams,
-        n=num_beams,
-    )
+    # Try to use BeamSearchParams for beam search if num_beams > 1
+    if num_beams > 1:
+        try:
+            from vllm.sampling_params import BeamSearchParams
+            print(f"DEBUG: Using BeamSearchParams with beam_width={num_beams}")
+            sampling_params = BeamSearchParams(
+                beam_width=num_beams,
+                max_tokens=max_new_tokens,
+                temperature=temperature,
+                # length_penalty=1.0, # Default
+            )
+        except ImportError:
+            print("DEBUG: BeamSearchParams not found. Fallback to random sampling.")
+            if temperature == 0:
+                temperature = 0.7
+            sampling_params = SamplingParams(
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
+                max_tokens=max_new_tokens,
+                n=num_beams,
+            )
+    else:
+        sampling_params = SamplingParams(
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            max_tokens=max_new_tokens,
+            n=num_beams,
+        )
 
     # Load test data
     with open(test_data_path, 'r') as f:
