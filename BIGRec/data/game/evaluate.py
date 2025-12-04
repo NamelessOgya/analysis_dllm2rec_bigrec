@@ -4,7 +4,7 @@ import torch
 import os
 import math
 import json
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 import argparse
 parse = argparse.ArgumentParser()
 parse.add_argument("--input_dir",type=str, default="./", help="your model directory")
@@ -33,17 +33,14 @@ f = open(os.path.join(script_dir, 'id2name.txt'), 'r')
 items = f.readlines()
 item_names = [_.split('\t')[0].strip("\"\n").strip(" ") for _ in items]
 item_ids = [_ for _ in range(len(item_names))]
-item_dict = dict()
-for i in range(len(item_names)):
-    if item_names[i] not in item_dict:
-        item_dict[item_names[i]] = [item_ids[i]]
-    else:   
-        item_dict[item_names[i]].append(item_ids[i])
+item_dict = dict(zip(item_names, item_ids))
+print("DEBUG: Items loaded.")
 import pandas as pd
 
 
 result_dict = dict()
 for p in path:
+    print(f"DEBUG: Processing file {p}...")
     result_dict[p] = {
         "NDCG": [],
         "HR": [],
@@ -51,11 +48,14 @@ for p in path:
     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
     model.config.bos_token_id = 1
     model.config.eos_token_id = 2
+    print("DEBUG: Setting model to eval mode...")
     model.eval()
+    print("DEBUG: Reading test data from file...")
     f = open(p, 'r')
     import json
     test_data = json.load(f)
     f.close()
+    print(f"DEBUG: Loaded {len(test_data)} items from test data.")
     text = [_["predict"][0].strip("\"") for _ in test_data]
     tokenizer.padding_side = "left"
 
@@ -65,6 +65,7 @@ for p in path:
             yield list[batch_size * i: batch_size * (i + 1)]
     predict_embeddings = []
     from tqdm import tqdm
+    print("DEBUG: Starting embedding generation loop...")
     for i, batch_input in tqdm(enumerate(batch(text, 16))):
         input = tokenizer(batch_input, return_tensors="pt", padding=True)
         input_ids = input.input_ids

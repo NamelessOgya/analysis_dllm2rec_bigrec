@@ -4,7 +4,7 @@ import torch
 import os
 import math
 import json
-os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import argparse
 parse = argparse.ArgumentParser()
 parse.add_argument("--input_dir",type=str, default="./", help="your model directory")
@@ -34,8 +34,10 @@ movies = f.readlines()
 movie_names = [_.split('::')[1].strip("\"") for _ in movies]
 movie_ids = [_ for _ in range(len(movie_names))]
 movie_dict = dict(zip(movie_names, movie_ids))
+print("DEBUG: Movies loaded.")
 result_dict = dict()
 for p in path:
+    print(f"DEBUG: Processing file {p}...")
     result_dict[p] = {
         "NDCG": [],
         "HR": [],
@@ -43,11 +45,14 @@ for p in path:
     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
     model.config.bos_token_id = 1
     model.config.eos_token_id = 2
+    print("DEBUG: Setting model to eval mode...")
     model.eval()
+    print("DEBUG: Reading test data from file...")
     f = open(p, 'r')
     import json
     test_data = json.load(f)
     f.close()
+    print(f"DEBUG: Loaded {len(test_data)} items from test data.")
     text = [_["predict"][0].strip("\"") for _ in test_data]
     tokenizer.padding_side = "left"
 
@@ -57,6 +62,7 @@ for p in path:
             yield list[batch_size * i: batch_size * (i + 1)]
     predict_embeddings = []
     from tqdm import tqdm
+    print("DEBUG: Starting embedding generation loop...")
     for i, batch_input in tqdm(enumerate(batch(text, 16))):
         input = tokenizer(batch_input, return_tensors="pt", padding=True)
         input_ids = input.input_ids
