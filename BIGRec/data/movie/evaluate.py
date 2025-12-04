@@ -25,7 +25,8 @@ model = LlamaForCausalLM.from_pretrained(
     device_map="auto",
 )
 
-f = open('./movies.dat', 'r', encoding='ISO-8859-1')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+f = open(os.path.join(script_dir, 'movies.dat'), 'r', encoding='ISO-8859-1')
 movies = f.readlines()
 movie_names = [_.split('::')[1].strip("\"") for _ in movies]
 movie_ids = [_ for _ in range(len(movie_names))]
@@ -62,7 +63,7 @@ for p in path:
         predict_embeddings.append(hidden_states[-1][:, -1, :].detach().cpu())
     
     predict_embeddings = torch.cat(predict_embeddings, dim=0).cuda()
-    movie_embedding = torch.load("./movie_embedding.pt").cuda()
+    movie_embedding = torch.load(os.path.join(script_dir, "movie_embedding.pt")).cuda()
     dist = torch.cdist(predict_embeddings, movie_embedding, p=2)
         
     

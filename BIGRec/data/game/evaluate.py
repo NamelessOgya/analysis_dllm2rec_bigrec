@@ -25,7 +25,8 @@ model = LlamaForCausalLM.from_pretrained(
 )
 
 
-f = open('./id2name.txt', 'r')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+f = open(os.path.join(script_dir, 'id2name.txt'), 'r')
 items = f.readlines()
 item_names = [_.split('\t')[0].strip("\"\n").strip(" ") for _ in items]
 item_ids = [_ for _ in range(len(item_names))]
@@ -70,7 +71,7 @@ for p in path:
         predict_embeddings.append(hidden_states[-1][:, -1, :].detach().cpu())
     
     predict_embeddings = torch.cat(predict_embeddings, dim=0).cuda()
-    movie_embedding = torch.load("./item_embedding.pt").cuda()
+    movie_embedding = torch.load(os.path.join(script_dir, "item_embedding.pt")).cuda()
     dist = torch.cdist(predict_embeddings, movie_embedding, p=2)
 
         
