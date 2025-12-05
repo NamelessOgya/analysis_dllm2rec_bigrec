@@ -3,6 +3,12 @@ Below is an instruction that describes a task, paired with an input that provide
 ### Instruction:
 {instruction}
 
+### Example Input:
+The user has played the following video games before:"Super Mario Bros.", "The Legend of Zelda"
+
+### Example Response:
+Super Mario Bros. 3
+
 ### Input:
 {input}
 
