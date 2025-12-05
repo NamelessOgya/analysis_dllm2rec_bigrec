@@ -18,14 +18,14 @@ cd "$DLLM2REC_DIR"
 # Run training
 # Set weights to 0 to disable distillation and regularization for pure SASRec baseline
 SECONDS=0
-CUDA_VISIBLE_DEVICES=$GPU_ID python main.py \
+python main.py \
     --data "$DATASET" \
     --model_name "SASRec" \
     --epoch "$EPOCH" \
     --alpha 0 \
     --ed_weight 0 \
     --lam 0 \
-    --cuda 0
+    --cuda "$GPU_ID"
 
 duration=$SECONDS
 echo "SASRec baseline training completed in $(($duration / 60)) minutes and $(($duration % 60)) seconds"
