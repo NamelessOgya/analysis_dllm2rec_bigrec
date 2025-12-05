@@ -165,26 +165,29 @@ def main(
         json.dump(test_data, f, indent=4)
 
 def generate_prompt(instruction, input=None):
+    # Read templates from files
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    template_path = os.path.join(script_dir, "templates", "prompt_template.txt")
+    template_no_input_path = os.path.join(script_dir, "templates", "prompt_template_no_input.txt")
+
     if input:
-        return f"""Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request. 
-
-### Instruction:
-{instruction}
-
-### Input:
-{input}
-
-### Response:
-"""
+        with open(template_path, "r") as f:
+            template = f.read()
+        # For inference, output is empty
+        return template.format(
+            instruction=instruction,
+            input=input,
+            output=""
+        )
     else:
-        return f"""Below is an instruction that describes a task. Write a response that appropriately completes the request.  
-
-### Instruction:
-{instruction}
-
-### Response:
-"""
+        with open(template_no_input_path, "r") as f:
+            template = f.read()
+        return template.format(
+            instruction=instruction,
+            output=""
+        )
 
 
 if __name__ == "__main__":
     fire.Fire(main)
+```

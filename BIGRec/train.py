@@ -279,26 +279,26 @@ def train(
 
 
 def generate_prompt(data_point):
-    # sorry about the formatting disaster gotta move fast
+    # Read templates from files
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    template_path = os.path.join(script_dir, "templates", "prompt_template.txt")
+    template_no_input_path = os.path.join(script_dir, "templates", "prompt_template_no_input.txt")
+    
     if data_point["input"]:
-        return f"""Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request. 
-
-### Instruction:
-{data_point["instruction"]}
-
-### Input:
-{data_point["input"]}
-
-### Response:
-{data_point["output"]}"""
+        with open(template_path, "r") as f:
+            template = f.read()
+        return template.format(
+            instruction=data_point["instruction"],
+            input=data_point["input"],
+            output=data_point["output"]
+        )
     else:
-        return f"""Below is an instruction that describes a task. Write a response that appropriately completes the request.  
-
-### Instruction:
-{data_point["instruction"]}
-
-### Response:
-{data_point["output"]}"""
+        with open(template_no_input_path, "r") as f:
+            template = f.read()
+        return template.format(
+            instruction=data_point["instruction"],
+            output=data_point["output"]
+        )
 
 
 if __name__ == "__main__":
