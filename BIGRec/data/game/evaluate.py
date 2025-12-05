@@ -13,13 +13,22 @@ parse.add_argument("--embedding_path", type=str, default=None, help="path to ite
 parse.add_argument("--save_results", action="store_true", help="save ranking results to txt files")
 parse.add_argument("--topk", type=int, default=200, help="topk for saving results")
 parse.add_argument("--batch_size", type=int, default=16, help="batch size for embedding generation")
+parse.add_argument("--input_file", type=str, default=None, help="specific input file to process")
 args = parse.parse_args()
 
 path = []
-for root, dirs, files in os.walk(args.input_dir):
-    for name in files:
-        if name.endswith(".json") and "metrics.json" not in name:
-            path.append(os.path.join(args.input_dir, name))
+if args.input_file:
+    if os.path.exists(args.input_file):
+        path.append(args.input_file)
+    else:
+        print(f"Error: Input file {args.input_file} not found.")
+        exit(1)
+else:
+    for root, dirs, files in os.walk(args.input_dir):
+        for name in files:
+            if name.endswith(".json") and "metrics.json" not in name:
+                if "test" in name or "valid" in name:
+                    path.append(os.path.join(args.input_dir, name))
 print(path)
 base_model = args.base_model
 print(f"DEBUG: Loading tokenizer from {base_model}...")
@@ -61,6 +70,15 @@ for p in path:
     test_data = json.load(f)
     f.close()
     print(f"DEBUG: Loaded {len(test_data)} items from test data.")
+    
+    # Validation check
+    if not isinstance(test_data, list):
+        print(f"WARNING: Skipping {p} because it is not a list (found {type(test_data)}).")
+        continue
+    if len(test_data) > 0 and "predict" not in test_data[0]:
+        print(f"WARNING: Skipping {p} because items do not contain 'predict' key.")
+        continue
+
     text = [_["predict"][0].strip("\"") for _ in test_data]
     tokenizer.padding_side = "left"
 
