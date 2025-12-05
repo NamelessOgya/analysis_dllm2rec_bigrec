@@ -16,6 +16,7 @@ DLLM2REC_DIR="DLLM2Rec"
 cd "$DLLM2REC_DIR"
 
 # Run training
+SECONDS=0
 CUDA_VISIBLE_DEVICES=$GPU_ID python main.py \
     --data "$DATASET" \
     --model_name "$MODEL_NAME" \
@@ -23,5 +24,8 @@ CUDA_VISIBLE_DEVICES=$GPU_ID python main.py \
     --ed_weight 0.3 \
     --lam 0.7 \
     --cuda 0
+
+duration=$SECONDS
+echo "Distillation process time: $(($duration / 60)) minutes and $(($duration % 60)) seconds"
 
 echo "DLLM2Rec training completed."

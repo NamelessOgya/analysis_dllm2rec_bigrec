@@ -29,6 +29,7 @@ mkdir -p "$OUTPUT_DIR"
 cd "$BIGREC_DIR"
 
 # Run training
+SECONDS=0
 # Note: Adjust arguments as needed based on README and requirements
 CUDA_VISIBLE_DEVICES=$GPU_ID python train.py \
     --base_model "$BASE_MODEL" \
@@ -48,5 +49,8 @@ CUDA_VISIBLE_DEVICES=$GPU_ID python train.py \
     --group_by_length \
     --seed $SEED \
     --sample $SAMPLE
+
+duration=$SECONDS
+echo "Finetuning time: $(($duration / 60)) minutes and $(($duration % 60)) seconds"
 
 echo "BIGRec training completed."

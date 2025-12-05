@@ -80,12 +80,15 @@ fi
 if [ "$SKIP_INFERENCE" = "true" ]; then
     echo "Skipping inference step as requested."
 else
+    SECONDS=0
     CUDA_VISIBLE_DEVICES=$GPU_ID python BIGRec/inference.py \
         --base_model "$BASE_MODEL" \
         --lora_weights "$LORA_WEIGHTS" \
         --test_data_path "$TEST_DATA_PATH" \
         --result_json_data "$RESULT_JSON_PATH" \
         --batch_size "$BATCH_SIZE"
+    duration=$SECONDS
+    echo "Data generation for distillation time: $(($duration / 60)) minutes and $(($duration % 60)) seconds"
 fi
 
 echo "Inference completed (or skipped). Running evaluation..."
@@ -93,12 +96,15 @@ echo "Inference completed (or skipped). Running evaluation..."
 # Run evaluation
 # evaluate.py takes --input_dir and processes all json files in it.
 # We point it to our specific result directory.
+SECONDS=0
 CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
     --input_dir "$RESULT_DIR" \
     --base_model "$BASE_MODEL" \
     --embedding_path "$EMBEDDING_FILE" \
     --save_results \
     --batch_size "$BATCH_SIZE"
+duration=$SECONDS
+echo "Teacher model accuracy evaluation time: $(($duration / 60)) minutes and $(($duration % 60)) seconds"
 
 # evaluate.py writes output to ./<dataset>.json (e.g., movie.json) in the current directory.
 # Since we are in root, it will be ./movie.json
