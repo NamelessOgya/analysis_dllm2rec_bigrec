@@ -84,7 +84,6 @@ def main(
         sampling_params = SamplingParams(
             temperature=0, # Temperature must be 0 for beam search
             max_tokens=max_new_tokens,
-            use_beam_search=True,
             best_of=num_beams,
             n=num_beams, # Return all beams
         )
@@ -96,7 +95,6 @@ def main(
             top_k=top_k,
             max_tokens=max_new_tokens,
             n=num_beams, # Usually 1
-            use_beam_search=False,
         )
 
     print(f"DEBUG: Starting generation for {len(prompts)} prompts...")
