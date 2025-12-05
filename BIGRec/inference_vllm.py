@@ -37,6 +37,7 @@ def main(
     top_p: float = 0.9,
     top_k: int = 40,
     num_beams: int = 4,
+    tensor_parallel_size: int = 1,
 ):
     assert base_model, "Please specify a --base_model"
 
@@ -48,7 +49,7 @@ def main(
     llm = LLM(
         model=base_model,
         enable_lora=enable_lora,
-        tensor_parallel_size=1, # Assuming single GPU
+        tensor_parallel_size=tensor_parallel_size,
         trust_remote_code=True,
         max_lora_rank=64, # Adjust if needed, default is usually sufficient but sometimes needs increase
         gpu_memory_utilization=0.9,
@@ -84,7 +85,6 @@ def main(
         sampling_params = SamplingParams(
             temperature=0, # Temperature must be 0 for beam search
             max_tokens=max_new_tokens,
-            use_beam_search=True,
             best_of=num_beams,
             n=num_beams, # Return all beams
         )
@@ -97,7 +97,6 @@ def main(
             max_tokens=max_new_tokens,
             n=num_beams, # Usually 1
             best_of=num_beams,
-            use_beam_search=False,
         )
 
     print(f"DEBUG: Starting generation for {len(prompts)} prompts...")

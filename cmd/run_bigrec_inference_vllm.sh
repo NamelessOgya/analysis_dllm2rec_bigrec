@@ -71,13 +71,19 @@ fi
 if [ "$SKIP_INFERENCE" = "true" ]; then
     echo "Skipping inference step as requested."
 else
+    # Calculate number of GPUs
+    IFS=',' read -ra GPU_ARRAY <<< "$GPU_ID"
+    NUM_GPUS=${#GPU_ARRAY[@]}
+    echo "Using $NUM_GPUS GPUs: $GPU_ID"
+
     # Note: vLLM manages GPU memory aggressively. We set CUDA_VISIBLE_DEVICES.
     CUDA_VISIBLE_DEVICES=$GPU_ID python BIGRec/inference_vllm.py \
         --base_model "$BASE_MODEL" \
         --lora_weights "$LORA_WEIGHTS" \
         --test_data_path "$TEST_DATA_PATH" \
         --result_json_data "$RESULT_JSON_PATH" \
-        --batch_size "$BATCH_SIZE"
+        --batch_size "$BATCH_SIZE" \
+        --tensor_parallel_size "$NUM_GPUS"
 fi
 
 echo "Inference completed (or skipped). Running evaluation..."
