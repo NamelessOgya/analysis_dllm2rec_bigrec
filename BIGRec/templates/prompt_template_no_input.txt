@@ -4,7 +4,7 @@ Below is an instruction that describes a task. Write a response that appropriate
 {instruction}
 
 ### Example Response:
-Super Mario Bros. 3
+the recommended game is Super Mario Bros. 3
 
 ### Response:
-{output}
+the recommended game is {output}

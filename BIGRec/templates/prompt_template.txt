@@ -7,10 +7,10 @@ Below is an instruction that describes a task, paired with an input that provide
 The user has played the following video games before:"Super Mario Bros.", "The Legend of Zelda"
 
 ### Example Response:
-Super Mario Bros. 3
+the recommended game is Super Mario Bros. 3
 
 ### Input:
 {input}
 
 ### Response:
-{output}
+the recommended game is {output}
