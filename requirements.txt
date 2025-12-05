@@ -14,5 +14,5 @@ pandas
 nbconvert
 ipykernel
 protobuf
-vllm
+vllm==0.12.0
 
