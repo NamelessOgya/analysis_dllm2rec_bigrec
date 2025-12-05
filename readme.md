@@ -78,14 +78,17 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 学習したモデルを用いて推論を行い、推薦結果を生成します。
 
 ```bash
-# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <test_data> <batch_size>
-# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16
+# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size>
+# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "valid_test" 16
 
-# 例: Qwenで推論と評価を実行（テストデータ: test_5000.json）
+# 例: Qwenで推論と評価を実行（デフォルト: valid.json と test.json を対象）
 ./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B"
 
-# 例: 学習データ(train.json)に対して推論を実行し、DLLM2Rec転送用データを生成（バッチサイズ32）
-./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false train.json 32
+# 例: valid, test, train すべてに対して推論と評価を実行
+./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "all"
+
+# 例: 特定のファイル（train.json）のみに対して推論を実行（バッチサイズ32）
+./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "train.json" 32
 
 # 例: 推論をスキップして評価のみ実行（推論結果が既にある場合）
 ./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 true
