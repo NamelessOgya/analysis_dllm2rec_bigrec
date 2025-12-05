@@ -33,6 +33,7 @@ def main(
     test_data_path: str = "data/test.json",
     result_json_data: str = "temp.json",
     batch_size: int=8,
+    limit: int = -1,
 ):
     assert (
         base_model
@@ -142,6 +143,9 @@ def main(
     with open(test_data_path, 'r') as f:
         print(f"DEBUG: Loading test data from {test_data_path}...")
         test_data = json.load(f)
+        if limit > 0:
+            print(f"DEBUG: Limiting test data to first {limit} items.")
+            test_data = test_data[:limit]
         print(f"DEBUG: Loaded {len(test_data)} items.")
         instructions = [_['instruction'] for _ in test_data]
         inputs = [_['input'] for _ in test_data]

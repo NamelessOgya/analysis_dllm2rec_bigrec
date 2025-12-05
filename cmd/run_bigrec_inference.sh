@@ -12,6 +12,7 @@ SAMPLE=${5:-1024}
 SKIP_INFERENCE=${6:-false}
 TARGET_SPLIT=${7:-"valid_test"}
 BATCH_SIZE=${8:-16}
+DEBUG_LIMIT=${9:--1}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
@@ -97,7 +98,8 @@ for TEST_DATA in "${FILES_TO_PROCESS[@]}"; do
             --lora_weights "$LORA_WEIGHTS" \
             --test_data_path "$TEST_DATA_PATH" \
             --result_json_data "$RESULT_JSON_PATH" \
-            --batch_size "$BATCH_SIZE"
+            --batch_size "$BATCH_SIZE" \
+            --limit "$DEBUG_LIMIT"
         duration=$SECONDS
         duration_min=$(($duration / 60))
         echo "Data generation for distillation time: $duration_min minutes"
