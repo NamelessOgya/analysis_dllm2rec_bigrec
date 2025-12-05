@@ -88,7 +88,19 @@ else
         --result_json_data "$RESULT_JSON_PATH" \
         --batch_size "$BATCH_SIZE"
     duration=$SECONDS
-    echo "Data generation for distillation time: $(($duration / 60)) minutes and $(($duration % 60)) seconds"
+    duration_min=$(($duration / 60))
+    echo "Data generation for distillation time: $duration_min minutes"
+    
+    # Save/Update execution time to JSON
+    python -c "import json; import os; 
+path = os.path.join('$RESULT_DIR', 'execution_time.json');
+data = {};
+if os.path.exists(path):
+    try:
+        with open(path, 'r') as f: data = json.load(f)
+    except: pass;
+data['data_generation_time_minutes'] = $duration_min;
+with open(path, 'w') as f: json.dump(data, f, indent=4)"
 fi
 
 echo "Inference completed (or skipped). Running evaluation..."
@@ -104,7 +116,19 @@ CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
     --save_results \
     --batch_size "$BATCH_SIZE"
 duration=$SECONDS
-echo "Teacher model accuracy evaluation time: $(($duration / 60)) minutes and $(($duration % 60)) seconds"
+duration_min=$(($duration / 60))
+echo "Teacher model accuracy evaluation time: $duration_min minutes"
+
+# Save/Update execution time to JSON
+python -c "import json; import os; 
+path = os.path.join('$RESULT_DIR', 'execution_time.json');
+data = {};
+if os.path.exists(path):
+    try:
+        with open(path, 'r') as f: data = json.load(f)
+    except: pass;
+data['evaluation_time_minutes'] = $duration_min;
+with open(path, 'w') as f: json.dump(data, f, indent=4)"
 
 # evaluate.py writes output to ./<dataset>.json (e.g., movie.json) in the current directory.
 # Since we are in root, it will be ./movie.json

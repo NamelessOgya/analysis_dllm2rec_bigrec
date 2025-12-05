@@ -51,6 +51,12 @@ CUDA_VISIBLE_DEVICES=$GPU_ID python train.py \
     --sample $SAMPLE
 
 duration=$SECONDS
-echo "Finetuning time: $(($duration / 60)) minutes and $(($duration % 60)) seconds"
+duration_min=$(($duration / 60))
+echo "Finetuning time: $duration_min minutes"
+
+# Save execution time to JSON
+python -c "import json; import os; 
+data = {'finetuning_time_minutes': $duration_min}; 
+with open(os.path.join('$OUTPUT_DIR', 'execution_time.json'), 'w') as f: json.dump(data, f, indent=4)"
 
 echo "BIGRec training completed."
