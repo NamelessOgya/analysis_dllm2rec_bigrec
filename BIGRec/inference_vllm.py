@@ -50,7 +50,8 @@ def main(
         enable_lora=enable_lora,
         tensor_parallel_size=1, # Assuming single GPU
         trust_remote_code=True,
-        max_lora_rank=64 # Adjust if needed, default is usually sufficient but sometimes needs increase
+        max_lora_rank=64, # Adjust if needed, default is usually sufficient but sometimes needs increase
+        gpu_memory_utilization=0.9,
     )
     print("DEBUG: vLLM model loaded.")
 
@@ -77,42 +78,34 @@ def main(
     # vLLM 0.12.0 has a dedicated beam_search method in LLM class.
     # We use that for beam search, and generate() for sampling.
     
+    # Configure sampling parameters
     if num_beams > 1:
-        from vllm.sampling_params import BeamSearchParams
-        print(f"DEBUG: Using BeamSearchParams with beam_width={num_beams}")
-        beam_params = BeamSearchParams(
-            beam_width=num_beams,
+        print(f"DEBUG: Using beam search with beam_width={num_beams}")
+        sampling_params = SamplingParams(
+            temperature=0, # Temperature must be 0 for beam search
             max_tokens=max_new_tokens,
-            temperature=temperature,
+            use_beam_search=True,
+            best_of=num_beams,
+            n=num_beams, # Return all beams
         )
-        
-        print(f"DEBUG: Starting beam search for {len(prompts)} prompts...")
-        # LLM.beam_search expects TextPrompt (dict) or TokensPrompt, not raw strings.
-        # We wrap strings into TextPrompt dicts.
-        beam_prompts = [{"prompt": p} for p in prompts]
-        outputs = llm.beam_search(beam_prompts, beam_params, lora_request=lora_request, use_tqdm=True)
-        
-        for i, output in enumerate(outputs):
-            # output is BeamSearchOutput, has sequences: list[BeamSearchSequence]
-            generated_texts = [seq.text for seq in output.sequences]
-            test_data[i]['predict'] = generated_texts
-            
     else:
+        print(f"DEBUG: Using sampling with temperature={temperature}")
         sampling_params = SamplingParams(
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
             max_tokens=max_new_tokens,
-            n=num_beams,
+            n=num_beams, # Usually 1
+            use_beam_search=False,
         )
-        
-        print(f"DEBUG: Starting generation for {len(prompts)} prompts...")
-        outputs = llm.generate(prompts, sampling_params, lora_request=lora_request)
-        
-        for i, output in enumerate(outputs):
-            # output is RequestOutput, has outputs: list[CompletionOutput]
-            generated_texts = [o.text for o in output.outputs]
-            test_data[i]['predict'] = generated_texts
+
+    print(f"DEBUG: Starting generation for {len(prompts)} prompts...")
+    outputs = llm.generate(prompts, sampling_params, lora_request=lora_request)
+    
+    for i, output in enumerate(outputs):
+        # output is RequestOutput, has outputs: list[CompletionOutput]
+        generated_texts = [o.text for o in output.outputs]
+        test_data[i]['predict'] = generated_texts
 
     print("DEBUG: Generation complete.")
 
