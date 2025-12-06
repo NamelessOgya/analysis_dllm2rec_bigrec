@@ -41,7 +41,7 @@ def convert_to_bigrec_format(df, output_path, id2title, split_type='train'):
     # train_df has 'seq' (list of ints) and 'next' (int)
     # val/test csv has 'seq' (string representation of list) and 'next' (int)
     
-    for index, row in tqdm(df.iterrows(), total=len(df)):
+    for index, row in df.iterrows():
         seq = row['seq']
         target = row['next']
         

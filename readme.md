@@ -52,7 +52,10 @@ BIGRec用のデータ前処理を行います。デフォルトは `movie` デ�
 # Movieデータセット（MovieLens 10M）を使用する場合
 ./cmd/run_preprocess_movie.sh
 
-# Gameデータセット（Amazon Video Games）を使用する場合
+# Gameデータセット（Amazon Video Games）を使用する場合（推奨: BIGRecロジック準拠）
+./cmd/run_preprocess_game_bigrec.sh
+
+# 旧Gameデータセット（非推奨: DLLM2Rec互換の問題あり）
 ./cmd/run_preprocess_game.sh
 ```
 
@@ -63,6 +66,9 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 ```bash
 # 引数: <dataset> <gpu_id> <seed> <sample> <batch_size> <micro_batch_size> <base_model> <num_epochs>
 # デフォルト: movie 0 0 1024 128 4 "Qwen/Qwen2-0.5B" 50
+
+# 例: Gameデータセット（推奨版）で学習
+./cmd/run_bigrec_train.sh game_bigrec 0 0 1024 128 128 "Qwen/Qwen2-0.5B" 50
 
 # 例: A100などで高速に学習する場合
 ./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B" 50
