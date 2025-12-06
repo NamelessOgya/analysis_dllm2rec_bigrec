@@ -122,7 +122,9 @@ for p in path:
         for i in range(len(test_data)):
             target_item = test_data[i]['output'].strip("\"").strip(" ")
             minID = 20000
-            target_id = item_dict[target_item]
+            target_id = item_dict.get(target_item)
+            if target_id is None:
+                continue
             minID = rank[i][target_id].item()
             if minID < topk:
                 S= S+ (1 / math.log(minID + 2))
