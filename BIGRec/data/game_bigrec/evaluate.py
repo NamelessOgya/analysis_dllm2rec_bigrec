@@ -99,14 +99,14 @@ for p in path:
         hidden_states = outputs.hidden_states
         predict_embeddings.append(hidden_states[-1][:, -1, :].detach().cpu())
     
-    predict_embeddings = torch.cat(predict_embeddings, dim=0).cuda()
+    predict_embeddings = torch.cat(predict_embeddings, dim=0)
     if args.embedding_path:
         embedding_file = args.embedding_path
     else:
         embedding_file = os.path.join(script_dir, "item_embedding.pt")
 
     print(f"DEBUG: Loading item embeddings from {embedding_file}...")
-    movie_embedding = torch.load(embedding_file).cuda()
+    movie_embedding = torch.load(embedding_file)
     dist = torch.cdist(predict_embeddings, movie_embedding, p=2)
 
         
