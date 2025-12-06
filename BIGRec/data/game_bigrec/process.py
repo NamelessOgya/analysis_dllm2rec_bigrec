@@ -12,17 +12,17 @@ random.seed(42)
 np.random.seed(42)
 
 def load_data():
-    # Read from ../game directory to reuse downloads
-    meta_path = '../game/meta_Video_Games.json'
-    reviews_path = '../game/Video_Games_5.json'
+    # Read from ../game_v2 directory to reuse downloads
+    meta_path = '../game_v2/meta_Video_Games.json'
+    reviews_path = '../game_v2/Video_Games_5.json'
     
     print(f"Loading metadata from {meta_path}...")
     with open(meta_path) as f:
-        metadata = [eval(line) for line in f]
+        metadata = [json.loads(line) for line in f]
     
     print(f"Loading reviews from {reviews_path}...")
     with open(reviews_path) as f:
-        reviews = [eval(line) for line in f]
+        reviews = [json.loads(line) for line in f]
         
     return metadata, reviews
 
@@ -46,10 +46,8 @@ def filter_data(metadata, reviews):
     id_item = {}
     cnt = 0
     for meta in tqdm(metadata):
-        if 'title' in meta and len(meta['title']) > 0:
+        if 'title' in meta and len(meta['title']) > 1:
             id_title[meta['asin']] = meta['title']
-        else:
-            id_title[meta['asin']] = meta['asin']
             
     processed_users = dict()
     for review in tqdm(reviews):

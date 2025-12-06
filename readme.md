@@ -44,6 +44,23 @@ LlamaなどのGated Modelを使用する場合は、Hugging Faceへのログイ�
 ./cmd/login_huggingface.sh
 ```
 
+### 1. データセットの準備 (game_bigrec)
+
+BIGRecとDLLM2Recの両方で完全に動作する、高品質なゲームデータセット(`game_bigrec`)を構築します。
+本プロジェクトでは、論文の実験設定を完全に再現するため、**Amazon V2 (5-core)** データセットを使用します。
+
+```bash
+# 1. Amazon V2データ（5-core）のダウンロード
+# (cmd/download_data_v2.sh を使用)
+./cmd/download_data_v2.sh
+
+# 2. データの前処理
+# - タイトルフィルタリング (len > 1) を適用
+# - BIGRec用JSONとDLLM2Rec用DataFrameを同時生成
+# - 論文の統計 (Items: 17,408, Seqs: 149,796) を再現
+docker exec dllm2rec_bigrec_container ./cmd/run_preprocess_game_bigrec.sh
+```
+
 ### 3. データ前処理
 
 BIGRec用のデータ前処理を行います。デフォルトは `movie` データセットです。
