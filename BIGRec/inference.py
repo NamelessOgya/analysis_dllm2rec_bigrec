@@ -3,6 +3,7 @@ import sys
 import fire
 import gradio as gr
 import torch
+import torch
 torch.set_num_threads(1)
 import transformers
 import json
@@ -87,6 +88,11 @@ def main(
     model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
     model.config.bos_token_id = 1
     model.config.eos_token_id = 2
+    
+    # if tokenizer.pad_token is None:
+    #     print("DEBUG: pad_token is None, setting to eos_token", flush=True)
+    #     tokenizer.pad_token = tokenizer.eos_token
+    #     model.config.pad_token_id = model.config.eos_token_id
 
     if not load_8bit:
         print("DEBUG: Converting model to half precision...")
