@@ -160,6 +160,15 @@ def save_dllm2rec_data(train, valid, test, item_num):
             next_item = target_id + 1
             len_seq = len(seq)
             
+            # Pad sequence to length 10
+            # SASRec expects fixed length sequences in checking batch
+            # utility.py pads at the end
+            pad_token = item_num + 1
+            if len_seq < 10:
+                seq = seq + [pad_token] * (10 - len_seq)
+            else:
+                seq = seq[-10:]
+            
             processed.append({
                 'seq': seq,
                 'len_seq': len_seq,
