@@ -51,13 +51,32 @@ BIGRec用のデータ前処理を行います。デフォルトは `movie` デ�
 ```bash
 # Movieデータセット（MovieLens 10M）を使用する場合
 ./cmd/run_preprocess_movie.sh
+```
 
-# Gameデータセット（Amazon Video Games）を使用する場合（推奨: BIGRecロジック準拠）
+# Gameデータセット
+## 1. BIGRec準拠 (推奨)
+BIGRecの論文/実装本来のロジック (`process.ipynb`) に完全準拠したデータセットです。IDの整合性が取れており、**再現実験にはこちらを使用することを強く推奨します**。
+```bash
 ./cmd/run_preprocess_game_bigrec.sh
+```
 
-# 旧Gameデータセット（非推奨: DLLM2Rec互換の問題あり）
+## 2. DLLM2Rec準拠 (非推奨)
+DLLM2Recのリポジトリに含まれていたデータセット (`date/game`) です。
+今回の実験で使用した `Video_Games_5.json` と比較して**データ規模が大きく、使用している元データが異なる可能性が高い**ため、今回の実験では参照用として扱います。
+```bash
 ./cmd/run_preprocess_game.sh
 ```
+
+### データセットの差異について
+
+| 項目 | BIGRec準拠 (`game_bigrec`) | DLLM2Rec準拠 (`game`) |
+| :--- | :--- | :--- |
+| **Max Item ID** | ~10,673 | ~17,408 |
+| **Train Rows** | ~61,144 | ~119,836 |
+| **生成ロジック** | BIGRec `process.ipynb` 準拠 | 不明 (より緩いフィルタリング?) |
+| **DLLM2Recファイル** | 自動生成 (`game_bigrec/process.py`) | リポジトリ同梱 |
+
+※ `game_bigrec` では、BIGRec用のJSONファイル生成時に、DLLM2Rec学習用の `train_data.df` 等も整合性を保った状態で自動生成されるように拡張しています。
 
 ### 4. BIGRecの学習
 
@@ -67,7 +86,7 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 # 引数: <dataset> <gpu_id> <seed> <sample> <batch_size> <micro_batch_size> <base_model> <num_epochs>
 # デフォルト: movie 0 0 1024 128 4 "Qwen/Qwen2-0.5B" 50
 
-# 例: Gameデータセット（推奨版）で学習
+# 例: Gameデータセット (BIGRec準拠) で学習
 ./cmd/run_bigrec_train.sh game_bigrec 0 0 1024 128 128 "Qwen/Qwen2-0.5B" 50
 
 # 例: A100などで高速に学習する場合
