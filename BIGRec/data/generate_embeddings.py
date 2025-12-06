@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate item embeddings for BIGRec evaluation")
-    parser.add_argument("--dataset", type=str, required=True, choices=["movie", "game"], help="Dataset name")
+    parser.add_argument("--dataset", type=str, required=True, choices=["movie", "game", "game_bigrec"], help="Dataset name")
     parser.add_argument("--base_model", type=str, required=True, help="Base model path")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for inference")
     parser.add_argument("--output_path", type=str, required=True, help="Output path for embeddings")
@@ -27,6 +27,8 @@ def main():
         input_file = os.path.join(script_dir, "movie", "movies.dat")
     elif args.dataset == "game":
         input_file = os.path.join(script_dir, "game", "id2name.txt")
+    elif args.dataset == "game_bigrec":
+        input_file = os.path.join(script_dir, "game_bigrec", "id2name.txt")
     
     output_file = args.output_path
     
@@ -49,7 +51,7 @@ def main():
             # Format: MovieID::Title::Genres
             # We extract Title. strip("\"") removes surrounding quotes if present.
             items = [line.split('::')[1].strip("\"") for line in lines]
-    elif args.dataset == "game":
+    elif args.dataset in ["game", "game_bigrec"]:
         with open(input_file, 'r') as f:
             lines = f.readlines()
             # Format: Title\tID

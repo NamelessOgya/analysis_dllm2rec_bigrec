@@ -27,4 +27,18 @@ cd "$DATA_DIR"
 # The script expects raw data in ../game/
 python process.py
 
+
 echo "Data preprocessing completed for $DATASET"
+
+# Copy data to DLLM2Rec directory for training
+DLLM2REC_DATA_DIR="../../../DLLM2Rec/data/$DATASET"
+echo "Copying data to DLLM2Rec directory: $DLLM2REC_DATA_DIR"
+mkdir -p "$DLLM2REC_DATA_DIR"
+
+cp train_data.df "$DLLM2REC_DATA_DIR/"
+cp val_data.csv "$DLLM2REC_DATA_DIR/"
+cp test_data.csv "$DLLM2REC_DATA_DIR/"
+cp data_statis.df "$DLLM2REC_DATA_DIR/"
+cp id2name.txt "$DLLM2REC_DATA_DIR/"
+
+echo "Data transfer to DLLM2Rec completed."

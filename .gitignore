@@ -18,3 +18,5 @@ test/integration/dummy_models/
 DLLM2Rec/tocf/dummy_data/
 BIGRec/model/
 BIGRec/data/*/*.json
+BIGRec/data/*/id2name.txt
+DLLM2Rec/data/game_bigrec/

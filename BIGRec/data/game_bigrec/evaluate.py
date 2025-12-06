@@ -161,5 +161,5 @@ for p in path:
                 f_score.write(line + '\n')
         print(f"Saved scores to {score_file}")
 
-f = open('./game.json', 'w')    
+f = open('./game_bigrec.json', 'w')    
 json.dump(result_dict, f, indent=4)
