@@ -9,6 +9,7 @@ from utility import pad_history, calculate_hit, extract_axis_1
 from collections import Counter
 from SASRecModules_ori import *
 import time
+import json
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run supervised GRU.")
@@ -281,6 +282,37 @@ def set_seed(seed):
     torch.manual_seed(seed)
 
 
+    torch.cuda.manual_seed_all(seed)
+    torch.manual_seed(seed)
+
+def save_metrics(args, test_hr, test_ndcg, valid_hr, valid_ndcg):
+    # Create directory
+    # Format: results/[data_name]/sasrec/seed_-1/
+    output_dir = os.path.join("results", args.data, "sasrec", "seed_-1")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save test metrics
+    test_dict = {
+        args.model_name.lower(): {
+            "NDCG": test_ndcg,
+            "HR": test_hr
+        }
+    }
+    with open(os.path.join(output_dir, "test_metrics.json"), 'w') as f:
+        json.dump(test_dict, f, indent=4)
+        
+    # Save valid metrics
+    valid_dict = {
+        args.model_name.lower(): {
+            "NDCG": valid_ndcg,
+            "HR": valid_hr
+        }
+    }
+    with open(os.path.join(output_dir, "valid_metrics.json"), 'w') as f:
+        json.dump(valid_dict, f, indent=4)
+    
+    print(f"Saved metrics to {output_dir}")
+
 if __name__ == '__main__':
     s = time.time()
     set_seed(2024)
@@ -349,6 +381,8 @@ if __name__ == '__main__':
     patient = 0
     best_hr_list_result = []
     best_ndcg_list_result = []
+    best_val_hr_list_result = []
+    best_val_ndcg_list_result = []
     best_accuracy = {}
     best_prediction = 0
     num_rows = train_data.shape[0]
@@ -498,7 +532,7 @@ if __name__ == '__main__':
             if step % 1 == 0:
                 print('VAL PHRASE:')
                 val_path = os.path.join(data_directory, 'val_data.csv')
-                prediction, hr_list, ndcg_list = myevaluate(model, val_path, device, llm_all_emb)
+                _, val_hr_list, val_ndcg_list = myevaluate(model, val_path, device, llm_all_emb)
                 print('TEST PHRASE:')
                 test_path = os.path.join(data_directory, 'test_data.csv')
                 s_test = time.time()
@@ -510,6 +544,8 @@ if __name__ == '__main__':
                     best_hr20 = hr_list[-1]
                     best_hr_list_result = hr_list
                     best_ndcg_list_result = ndcg_list
+                    best_val_hr_list_result = val_hr_list
+                    best_val_ndcg_list_result = val_ndcg_list
                     best_step = step
                     best_prediction = prediction
                 else:
@@ -521,4 +557,5 @@ if __name__ == '__main__':
                     cost = (e - s)/60
                     print(f'=============early stop=============')
                     print(f'cost {cost} min')
+                    save_metrics(args, best_hr_list_result, best_ndcg_list_result, best_val_hr_list_result, best_val_ndcg_list_result)
                     exit(0)
