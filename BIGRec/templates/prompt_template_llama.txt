@@ -2,18 +2,16 @@ You are a recommendation engine.
 
 Given the user's history, recommend ONE item.
 Output ONLY the title of the recommended item.
-Do not include any additional words, sentences, or punctuation other than the title itself.
+Do NOT repeat the input.
+Do NOT include any additional words, sentences, labels, or punctuation.
 
-### Instruction:
+Instruction:
 {instruction}
 
-### Example Input:
-The user has played the following video games before: Super Mario Bros., The Legend of Zelda
+Example:
+Input: The user has played the following video games before: Super Mario Bros., The Legend of Zelda
+Output: Super Mario Bros. 3
 
-### Example Response:
-Super Mario Bros. 3
-
-### Input:
-{input}
-
-### Response:
+Task:
+Input: {input}
+Output:
