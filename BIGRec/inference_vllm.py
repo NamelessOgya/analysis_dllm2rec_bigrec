@@ -166,7 +166,8 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
     # We'll use the passed batch_size argument but ensure it's at least reasonable.
     # UPDATE: Using 32 causes too many sync barriers.
     # UPDATE 2: Passing all (120k) causes OOM (Killed).
-    # Compromise: Batch size of 10000 as requested by user.
+    # UPDATE 3: 10k was fine, OOM was in evaluation.
+    # Restore to 10000 for efficiency.
     eff_batch_size = max(batch_size, 10000) 
     
     total_batches = (len(prompts) + eff_batch_size - 1) // eff_batch_size

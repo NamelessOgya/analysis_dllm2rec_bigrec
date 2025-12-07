@@ -100,66 +100,134 @@ for p in path:
         predict_embeddings.append(hidden_states[-1][:, -1, :].detach().cpu())
     
     predict_embeddings = torch.cat(predict_embeddings, dim=0)
+    
     if args.embedding_path:
         embedding_file = args.embedding_path
     else:
         embedding_file = os.path.join(script_dir, "item_embedding.pt")
 
     print(f"DEBUG: Loading item embeddings from {embedding_file}...")
-    movie_embedding = torch.load(embedding_file)
-    dist = torch.cdist(predict_embeddings, movie_embedding, p=2)
-
+    # Load to GPU immediately for cdist
+    if torch.cuda.is_available():
+        device = "cuda" 
+    else: 
+        device = "cpu"
         
-    rank = dist
-    rank = rank.argsort(dim = -1).argsort(dim = -1)
+    movie_embedding = torch.load(embedding_file, map_location=device)
+    if device == "cuda":
+        movie_embedding = movie_embedding.cuda()
+
+    # Prepare for saving results
+    base_name = os.path.splitext(p)[0]
+    rank_file = f"{base_name}_rank.txt"
+    score_file = f"{base_name}_score.txt"
+    
+    f_rank = None
+    f_score = None
+    if args.save_results:
+        f_rank = open(rank_file, 'w')
+        f_score = open(score_file, 'w')
+        print(f"DEBUG: Saving ranking results incrementally to {rank_file} and {score_file}...")
+
+    # Evaluation Batch Size (for distance calc)
+    eval_batch_size = 1024 
+    
+    # helper for batching tensor
+    def get_batches_tensor(tensor, batch_size):
+        for i in range(0, tensor.size(0), batch_size):
+            yield tensor[i:i + batch_size], i
+
     topk_list = [1, 3, 5, 10, 20, 50]
+    # Initialize accumulators
+    S_list = {k: 0.0 for k in topk_list}
+    SS_list = {k: 0.0 for k in topk_list}
+    LL = len(test_data)
+    
+    print(f"DEBUG: Starting batched evaluation (Batch Size: {eval_batch_size})...")
+    
+    for batch_pred_emb, start_idx in tqdm(get_batches_tensor(predict_embeddings, eval_batch_size), total=(predict_embeddings.size(0) + eval_batch_size - 1) // eval_batch_size):
+        # Move batch to GPU
+        if device == "cuda":
+            batch_pred_emb = batch_pred_emb.cuda()
+            
+        # Compute distance [B, N_items]
+        dist = torch.cdist(batch_pred_emb, movie_embedding, p=2)
+        
+        # Incremental Ranking Saving
+        if args.save_results:
+            # We need top-k indices and values for saving
+            # And also we might need full rank for metrics? 
+            # Actually metrics calc below iterates items.
+            # Usually metrics need the rank position of the ground truth.
+            # Computing full argsort for huge items is still heavy [B, N_items].
+            # But [1024, 17000] is fine.
+            pass
+            
+        # Calculate Rank for Metrics
+        # rank[b][item_id] gives the rank (0-based) of item_id
+        # argsort().argsort() is standard trick. 
+        # dist is [B, M]
+        batch_rank = dist.argsort(dim=-1).argsort(dim=-1) # [B, M]
+        
+        # Save results (Top-K)
+        if args.save_results:
+            sorted_dist_indices = dist.argsort(dim=-1) # [B, M]
+            topk_indices = sorted_dist_indices[:, :args.topk] # [B, K]
+            topk_values = torch.gather(dist, 1, topk_indices) # [B, K]
+            
+            # Move to CPU for writing
+            topk_indices_cpu = topk_indices.cpu().numpy()
+            topk_values_cpu = topk_values.cpu().numpy()
+            
+            for row in topk_indices_cpu:
+                line = ' '.join(map(str, row.tolist()))
+                f_rank.write(line + '\n')
+                
+            for row in topk_values_cpu:
+                line = ' '.join(map(str, row.tolist()))
+                f_score.write(line + '\n')
+
+        # Compute Metrics
+        # batch_rank is on GPU. move to CPU to avoid item access overhead? 
+        # or verify if item access on GPU is fast enough.
+        # Actually random access like `rank[i][target_id]` on GPU tensor from CPU scalar index is slow.
+        # Better move batch_rank to CPU.
+        batch_rank_cpu = batch_rank.cpu()
+        
+        current_batch_size = batch_rank.size(0)
+        for b in range(current_batch_size):
+            global_idx = start_idx + b
+            target_item = test_data[global_idx]['output'].strip("\"").strip(" ")
+            target_id = item_dict.get(target_item)
+            
+            if target_id is None:
+                continue
+                
+            minID = batch_rank_cpu[b][target_id].item()
+            
+            for topk in topk_list:
+                if minID < topk:
+                    S_list[topk] += (1 / math.log(minID + 2))
+                    SS_list[topk] += 1
+
+    if f_rank: f_rank.close()
+    if f_score: f_score.close()
+
     NDCG = []
     HR = []
     for topk in topk_list:
-        S = 0
-        SS = 0
-        LL = len(test_data)
-        for i in range(len(test_data)):
-            target_item = test_data[i]['output'].strip("\"").strip(" ")
-            minID = 20000
-            target_id = item_dict.get(target_item)
-            if target_id is None:
-                continue
-            minID = rank[i][target_id].item()
-            if minID < topk:
-                S= S+ (1 / math.log(minID + 2))
-                SS = SS + 1
-        temp_NDCG = []
-        temp_HR = []
-        NDCG.append(S / LL / (1.0 / math.log(2)))
-        HR.append(SS / LL)
+        NDCG.append(S_list[topk] / LL / (1.0 / math.log(2)))
+        HR.append(SS_list[topk] / LL)
 
     print(NDCG)
     print(HR)
     print('_' * 100)
     result_dict[p]["NDCG"] = NDCG
     result_dict[p]["HR"] = HR
-
+    
     if args.save_results:
-        print(f"DEBUG: Saving ranking results (top {args.topk}) to files...")
-        sorted_indices = dist.argsort(dim=-1)
-        topk_indices = sorted_indices[:, :args.topk]
-        
-        base_name = os.path.splitext(p)[0]
-        rank_file = f"{base_name}_rank.txt"
-        with open(rank_file, 'w') as f_rank:
-            for row in topk_indices:
-                line = ' '.join(map(str, row.tolist()))
-                f_rank.write(line + '\n')
-        print(f"Saved rank to {rank_file}")
-        
-        topk_values = torch.gather(dist, 1, topk_indices)
-        score_file = f"{base_name}_score.txt"
-        with open(score_file, 'w') as f_score:
-            for row in topk_values:
-                line = ' '.join(map(str, row.tolist()))
-                f_score.write(line + '\n')
-        print(f"Saved scores to {score_file}")
+         print(f"Saved rank to {rank_file}")
+         print(f"Saved scores to {score_file}")
 
 f = open('./game_bigrec.json', 'w')    
 json.dump(result_dict, f, indent=4)
