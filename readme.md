@@ -116,26 +116,28 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 ```
 
 ### 5. BIGRecの推論
-
-学習したモデルを用いて推論を行い、推薦結果を生成します。
-
-```bash
-# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size>
-# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "valid_test" 16
-
-# 例: Qwenで推論と評価を実行（デフォルト: valid.json と test.json を対象）
-./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B"
-
-# 例: valid, test, train すべてに対して推論と評価を実行
-./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "all"
-
-# 例: 特定のファイル（train.json）のみに対して推論を実行（バッチサイズ32）
-./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "train.json" 32
-
-# 例: 推論をスキップして評価のみ実行（推論結果が既にある場合）
-./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 true
+... (existing content) ...
 ```
 ※ 推論完了後、自動的に評価スクリプト (`evaluate.py`) が実行され、結果は `BIGRec/results/...` に保存されます。
+
+### 6. BIGRecの推論 (vLLMによる高速化版)
+
+vLLMを使用して推論を高速に実行します。
+
+```bash
+# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size> <limit>
+# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1
+
+# 例: 基本的な実行（デフォルト設定）
+./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B"
+
+# 例: train.json の最初の100件のみを実行（テスト用）
+# 第9引数で limit を指定します
+./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "train.json" 16 100
+
+# 例: train.json 全件を実行（本番用）
+./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "train.json" 16 -1
+```
 
 ### 6. データ転送
 

@@ -12,6 +12,7 @@ SAMPLE=${5:-1024}
 SKIP_INFERENCE=${6:-false}
 TEST_DATA=${7:-"test_5000.json"}
 BATCH_SIZE=${8:-16} # Kept for compatibility, though vLLM manages it internally
+LIMIT=${9:--1}      # New argument: Limit number of items to process (-1 for all)
 
 echo "Running BIGRec inference (vLLM) for dataset: $DATASET"
 
@@ -75,6 +76,7 @@ else
     IFS=',' read -ra GPU_ARRAY <<< "$GPU_ID"
     NUM_GPUS=${#GPU_ARRAY[@]}
     echo "Using $NUM_GPUS GPUs: $GPU_ID"
+    echo "Processing limit: $LIMIT"
 
     # Note: vLLM manages GPU memory aggressively. We set CUDA_VISIBLE_DEVICES.
     CUDA_VISIBLE_DEVICES=$GPU_ID python BIGRec/inference_vllm.py \
@@ -83,18 +85,22 @@ else
         --test_data_path "$TEST_DATA_PATH" \
         --result_json_data "$RESULT_JSON_PATH" \
         --batch_size "$BATCH_SIZE" \
-        --tensor_parallel_size "$NUM_GPUS"
+        --tensor_parallel_size "$NUM_GPUS" \
+        --limit "$LIMIT"
 fi
 
 echo "Inference completed (or skipped). Running evaluation..."
 
-# Run evaluation (unchanged)
+# Run evaluation
+# Explicitly pass --input_file to ensure the just-generated file is processed
+# This bypasses the name filter in evaluate.py that might ignore "train.json"
 CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
     --input_dir "$RESULT_DIR" \
     --base_model "$BASE_MODEL" \
     --embedding_path "$EMBEDDING_FILE" \
     --save_results \
-    --batch_size "$BATCH_SIZE"
+    --batch_size "$BATCH_SIZE" \
+    --input_file "$RESULT_JSON_PATH"
 
 if [ -f "./${DATASET}.json" ]; then
     mv "./${DATASET}.json" "$RESULT_DIR/metrics.json"

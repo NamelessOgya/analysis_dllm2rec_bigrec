@@ -20,3 +20,9 @@ BIGRec/model/
 BIGRec/data/*/*.json
 BIGRec/data/*/id2name.txt
 DLLM2Rec/data/game_bigrec/
+
+# User requested ignores
+result/
+results/
+output/
+debug_vllm.log

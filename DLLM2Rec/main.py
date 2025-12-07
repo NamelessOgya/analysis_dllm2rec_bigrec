@@ -42,7 +42,7 @@ def parse_args():
 
     
 class GRU(nn.Module):
-    def __init__(self, hidden_size, item_num, state_size, gru_layers=1):
+    def __init__(self, hidden_size, item_num, state_size, gru_layers=1, llm_input_dim=4096):
         super(GRU, self).__init__()
         self.hidden_size = hidden_size
         self.item_num = item_num
@@ -60,13 +60,13 @@ class GRU(nn.Module):
         )
         self.s_fc = nn.Linear(self.hidden_size, self.item_num)
 
-        self.fc_4096_64 = nn.Linear(4096, 64)
+        self.fc_llm = nn.Linear(llm_input_dim, 64)
 
     def forward(self, states, len_states, llm_emb=None):
         # Supervised Head
         emb = self.item_embeddings(states)
         if llm_emb != None:
-            llm_emb = self.fc_4096_64(llm_emb)
+            llm_emb = self.fc_llm(llm_emb)
             emb = emb + args.ed_weight * llm_emb
         if 0 in len_states:
             len_states = [max(1, length) for length in len_states]
@@ -78,7 +78,7 @@ class GRU(nn.Module):
 
 class Caser(nn.Module):
     def __init__(self, hidden_size, item_num, state_size, num_filters, filter_sizes,
-                 dropout_rate):
+                 dropout_rate, llm_input_dim=4096):
         super(Caser, self).__init__()
         self.hidden_size = hidden_size
         self.item_num = int(item_num)
@@ -115,12 +115,12 @@ class Caser(nn.Module):
         # dropout
         self.dropout = nn.Dropout(self.dropout_rate)
 
-        self.fc_4096_64 = nn.Linear(4096, 64)
+        self.fc_llm = nn.Linear(llm_input_dim, 64)
 
     def forward(self, states, len_states, llm_emb=None):
         input_emb = self.item_embeddings(states)
         if llm_emb != None:
-            llm_emb = self.fc_4096_64(llm_emb)
+            llm_emb = self.fc_llm(llm_emb)
             input_emb = input_emb + args.ed_weight * llm_emb
         mask = torch.ne(states, self.item_num).float().unsqueeze(-1)
         input_emb *= mask
@@ -145,7 +145,7 @@ class Caser(nn.Module):
         return supervised_output
 
 class SASRec(nn.Module):
-    def __init__(self, hidden_size, item_num, state_size, dropout, device, num_heads=1):
+    def __init__(self, hidden_size, item_num, state_size, dropout, device, num_heads=1, llm_input_dim=4096):
         super(SASRec, self).__init__()
         self.state_size = state_size
         self.hidden_size = hidden_size
@@ -170,13 +170,13 @@ class SASRec(nn.Module):
         self.feed_forward = PositionwiseFeedForward(hidden_size, hidden_size, dropout)
         self.s_fc = nn.Linear(hidden_size, item_num)
            
-        self.fc_4096_64 = nn.Linear(4096, 64)
+        self.fc_llm = nn.Linear(llm_input_dim, 64)
         self.relu = nn.ReLU()
 
     def forward(self, states, len_states, llm_emb=None):
         inputs_emb = self.item_embeddings(states)
         if llm_emb != None:
-            llm_emb = self.fc_4096_64(llm_emb)
+            llm_emb = self.fc_llm(llm_emb)
             inputs_emb = inputs_emb + args.ed_weight * llm_emb
         inputs_emb += self.positional_embeddings(torch.arange(self.state_size).to(self.device))
         seq = self.emb_dropout(inputs_emb)
@@ -220,7 +220,8 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
 
     if llm_all_emb != None:
         seq = states
-        llm_emb = torch.zeros(seq.size(0), seq.size(1), 4096, device=device)
+        llm_dim = llm_all_emb.shape[1]
+        llm_emb = torch.zeros(seq.size(0), seq.size(1), llm_dim, device=device)
         mask = seq < llm_all_emb.size(0)
         llm_emb[mask] = llm_all_emb[seq[mask]]
         llm_emb = llm_emb.to(device)
@@ -333,13 +334,24 @@ if __name__ == '__main__':
     topk = [1, 5, 10, 20]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    tocf_data_directory = './tocf/' + args.data
+    if args.ed_weight != 0:
+        llm_all_emb_path = os.path.join(tocf_data_directory, 'all_embeddings.pt')
+        llm_all_emb = torch.load(llm_all_emb_path) # [num_item, 4096]
+        llm_all_emb = llm_all_emb.to(device)
+        llm_input_dim = llm_all_emb.shape[1]
+    else:
+        llm_all_emb = None
+        llm_input_dim = 4096 # default
+        print('without using collaborative embedding distillation!')
+
     model_name = args.model_name
     if model_name == "GRU":           
-        model = GRU(args.hidden_factor, item_num, seq_size)
+        model = GRU(args.hidden_factor, item_num, seq_size, llm_input_dim=llm_input_dim)
     elif model_name == "SASRec":
-        model = SASRec(args.hidden_factor, item_num, seq_size, args.dropout_rate, device)
+        model = SASRec(args.hidden_factor, item_num, seq_size, args.dropout_rate, device, llm_input_dim=llm_input_dim)
     elif model_name == "Caser":
-        model = Caser(args.hidden_factor,item_num, seq_size, args.num_filters, args.filter_sizes, args.dropout_rate)
+        model = Caser(args.hidden_factor,item_num, seq_size, args.num_filters, args.filter_sizes, args.dropout_rate, llm_input_dim=llm_input_dim)
     else:
         print("check model name!")
         exit(-1)
@@ -356,7 +368,6 @@ if __name__ == '__main__':
         ps = torch.tensor(ps)
         ps = ps.to(device)
 
-    tocf_data_directory = './tocf/' + args.data
     if args.lam != 0:       
         candidate_path = os.path.join(tocf_data_directory, 'myrank_train.txt')
         all_candidate = np.loadtxt(candidate_path)
@@ -366,13 +377,7 @@ if __name__ == '__main__':
         llm_confidence = torch.tensor(llm_confidence, dtype=torch.float).to(device) # [train_data_num, k]
     else:
         print('without using importance-aware ranking distillation!')
-    if args.ed_weight != 0:
-        llm_all_emb_path = os.path.join(tocf_data_directory, 'all_embeddings.pt')
-        llm_all_emb = torch.load(llm_all_emb_path) # [num_item, 4096]
-        llm_all_emb = llm_all_emb.to(device)
-    else:
-        llm_all_emb = None
-        print('without using collaborative embedding distillation!')
+
 
     total_step = 0
     best_ndcg20 = 0
@@ -427,7 +432,7 @@ if __name__ == '__main__':
 
             # llm_emb getting
             if llm_all_emb != None:
-                llm_emb = torch.zeros(seq.size(0), seq.size(1), 4096, device=device)
+                llm_emb = torch.zeros(seq.size(0), seq.size(1), llm_input_dim, device=device)
                 mask = seq < llm_all_emb.size(0)
                 llm_emb[mask] = llm_all_emb[seq[mask]]
                 llm_emb = llm_emb.to(device)  
