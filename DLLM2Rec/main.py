@@ -66,7 +66,7 @@ class GRU(nn.Module):
         # Supervised Head
         emb = self.item_embeddings(states)
         if llm_emb != None:
-            llm_emb = self.fc_llm(llm_emb)
+            llm_emb = self.fc_llm(llm_emb.float())
             emb = emb + args.ed_weight * llm_emb
         if 0 in len_states:
             len_states = [max(1, length) for length in len_states]
@@ -120,7 +120,7 @@ class Caser(nn.Module):
     def forward(self, states, len_states, llm_emb=None):
         input_emb = self.item_embeddings(states)
         if llm_emb != None:
-            llm_emb = self.fc_llm(llm_emb)
+            llm_emb = self.fc_llm(llm_emb.float())
             input_emb = input_emb + args.ed_weight * llm_emb
         mask = torch.ne(states, self.item_num).float().unsqueeze(-1)
         input_emb *= mask
@@ -176,7 +176,7 @@ class SASRec(nn.Module):
     def forward(self, states, len_states, llm_emb=None):
         inputs_emb = self.item_embeddings(states)
         if llm_emb != None:
-            llm_emb = self.fc_llm(llm_emb)
+            llm_emb = self.fc_llm(llm_emb.float())
             inputs_emb = inputs_emb + args.ed_weight * llm_emb
         inputs_emb += self.positional_embeddings(torch.arange(self.state_size).to(self.device))
         seq = self.emb_dropout(inputs_emb)
@@ -221,7 +221,7 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
     if llm_all_emb != None:
         seq = states
         llm_dim = llm_all_emb.shape[1]
-        llm_emb = torch.zeros(seq.size(0), seq.size(1), llm_dim, device=device)
+        llm_emb = torch.zeros(seq.size(0), seq.size(1), llm_dim, dtype=llm_all_emb.dtype, device=device)
         mask = seq < llm_all_emb.size(0)
         llm_emb[mask] = llm_all_emb[seq[mask]]
         llm_emb = llm_emb.to(device)
@@ -432,7 +432,7 @@ if __name__ == '__main__':
 
             # llm_emb getting
             if llm_all_emb != None:
-                llm_emb = torch.zeros(seq.size(0), seq.size(1), llm_input_dim, device=device)
+                llm_emb = torch.zeros(seq.size(0), seq.size(1), llm_input_dim, dtype=llm_all_emb.dtype, device=device)
                 mask = seq < llm_all_emb.size(0)
                 llm_emb[mask] = llm_all_emb[seq[mask]]
                 llm_emb = llm_emb.to(device)  
