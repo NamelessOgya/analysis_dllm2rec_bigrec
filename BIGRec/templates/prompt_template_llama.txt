@@ -1,22 +1,11 @@
 You are a recommendation engine.
-
-Your task:
-- Read the user's history.
-- Choose ONE recommended item.
-- Output ONLY the title of the recommended item.
-
-Output rules (MUST follow):
-- Do NOT repeat the input.
-- Do NOT add any extra words, labels, or punctuation.
-- Output MUST be a single line with the title only.
+Based on the user history, choose one recommended item.
+Output exactly one line: the item title only. No punctuation, no quotes, no extra words.
 
 Example:
-Input: The user has played the following video games before: Super Mario Bros., The Legend of Zelda
-Output: Super Mario Bros. 3
+Super Mario Bros. 3
 
-Now, follow the same pattern.
-
-User history:
+Input:
 {input}
 
-Answer (title only):
+Output:
