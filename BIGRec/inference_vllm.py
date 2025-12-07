@@ -154,6 +154,21 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
     
     print(f"DEBUG: Starting generation...")
     
+    # Helper to chunk data
+    def get_batches(lst, batch_size):
+        for i in range(0, len(lst), batch_size):
+            yield lst[i:i + batch_size]
+    
+    # Use a larger batch size for vLLM throughput if configured small
+    # But for progress bar, we want frequent updates. user passed batch_size=16 probably.
+    # vLLM handles internal batching, so sending 16 at a time is fine, just maybe slightly slower overhead than sending 1000.
+    # We'll use the passed batch_size argument but ensure it's at least reasonable.
+    # UPDATE: Using 32 causes too many sync barriers (waiting for batch to empty).
+    # Increasing to 512 to balance throughput (continuous batching) and progress updates.
+    eff_batch_size = max(batch_size, 512) 
+    
+    total_batches = (len(prompts) + eff_batch_size - 1) // eff_batch_size
+    
     if num_beams > 1:
         if BeamSearchParams is None:
             raise ImportError("BeamSearchParams not found. Please check vLLM version (0.12.0+ required for this implementation).")
@@ -166,16 +181,18 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
             ignore_eos=False 
         )
         
-        # Use beam_search method
-        # vLLM beam_search expects dict with "prompt" key or tokens
-        beam_prompts = [{"prompt": p} for p in prompts]
-        outputs = llm.beam_search(beam_prompts, beam_params)
-        
-        for i, output in enumerate(outputs):
-            # output is BeamSearchOutput, contains 'sequences' which is List[BeamSearchSequence]
-            # BeamSearchSequence has 'text'
-            generated_texts = ["the recommended game is " + seq.text for seq in output.sequences]
-            test_data[i]['predict'] = generated_texts
+        for i, batch_prompts in tqdm(enumerate(get_batches(prompts, eff_batch_size)), total=total_batches, desc="Inference Batches"):
+            # vLLM beam_search expects dict with "prompt" key or tokens
+            batch_beam_prompts = [{"prompt": p} for p in batch_prompts]
+            outputs = llm.beam_search(batch_beam_prompts, beam_params)
+            
+            # Map outputs back to global index
+            global_start_idx = i * eff_batch_size
+            for j, output in enumerate(outputs):
+                # output is BeamSearchOutput, contains 'sequences' which is List[BeamSearchSequence]
+                # BeamSearchSequence has 'text'
+                generated_texts = ["the recommended game is " + seq.text for seq in output.sequences]
+                test_data[global_start_idx + j]['predict'] = generated_texts
             
     else:
         print(f"DEBUG: Using Sampling (greedy/sampling)")
@@ -186,11 +203,13 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
             max_tokens=max_new_tokens,
         )
 
-        outputs = llm.generate(prompts, sampling_params, lora_request=lora_request)
-        
-        for i, output in enumerate(outputs):
-            generated_texts = ["the recommended game is " + o.text for o in output.outputs]
-            test_data[i]['predict'] = generated_texts
+        for i, batch_prompts in tqdm(enumerate(get_batches(prompts, eff_batch_size)), total=total_batches, desc="Inference Batches"):
+            outputs = llm.generate(batch_prompts, sampling_params, lora_request=lora_request)
+            
+            global_start_idx = i * eff_batch_size
+            for j, output in enumerate(outputs):
+                generated_texts = ["the recommended game is " + o.text for o in output.outputs]
+                test_data[global_start_idx + j]['predict'] = generated_texts
 
     print("DEBUG: Generation complete.")
 
