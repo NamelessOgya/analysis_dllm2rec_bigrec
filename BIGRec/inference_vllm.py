@@ -129,10 +129,11 @@ def main(
             top_p, 
             top_k, 
             max_new_tokens,
-            limit
+            limit,
+            batch_size
         )
 
-def process_file(llm, input_path, output_path, lora_request, num_beams, temperature, top_p, top_k, max_new_tokens, limit):
+def process_file(llm, input_path, output_path, lora_request, num_beams, temperature, top_p, top_k, max_new_tokens, limit, batch_size):
     print(f"DEBUG: Processing {input_path} -> {output_path}")
     
     if not os.path.exists(input_path):
