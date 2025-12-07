@@ -1,17 +1,18 @@
 You are a recommendation engine.
+Recommend ONE item based on the user's history.
 
-Given the user's history, recommend ONE item.
-Output ONLY the title of the recommended item.
+Output ONLY the following JSON:
+{"title": "<recommended_item>"}
+
+Do NOT include anything outside the JSON.
 Do NOT repeat the input.
-Do NOT include any additional words, sentences, labels, or punctuation.
-
-Instruction:
-{instruction}
+Do NOT add explanations or markdown.
 
 Example:
-Input: The user has played the following video games before: Super Mario Bros., The Legend of Zelda
-Output: Super Mario Bros. 3
+Input: The user has played: Super Mario Bros., The Legend of Zelda
+Output: {"title": "Super Mario Bros. 3"}
 
-Task:
+Now answer.
+
 Input: {input}
-Output:
+Output >>
