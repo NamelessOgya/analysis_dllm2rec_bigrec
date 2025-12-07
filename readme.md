@@ -100,8 +100,9 @@ DLLM2Recのリポジトリに含まれていたデータセット (`date/game`) 
 BIGRecモデル（LLM）のFine-tuningを行います。
 
 ```bash
-# 引数: <dataset> <gpu_id> <seed> <sample> <batch_size> <micro_batch_size> <base_model> <num_epochs>
-# デフォルト: movie 0 0 1024 128 4 "Qwen/Qwen2-0.5B" 50
+# 引数: <dataset> <gpu_id> <seed> <sample> <batch_size> <micro_batch_size> <base_model> <num_epochs> <prompt_file>
+# デフォルト: movie 0 0 1024 128 4 "Qwen/Qwen2-0.5B" 50 ""
+
 
 # 例: Gameデータセット (BIGRec準拠) で学習
 ./cmd/run_bigrec_train.sh game_bigrec 0 0 1024 128 128 "Qwen/Qwen2-0.5B" 50
@@ -113,6 +114,11 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 # 出力ディレクトリはモデル名を含むため競合しません
 ./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B" 50 &
 ./cmd/run_bigrec_train.sh movie 1 0 1024 128 128 "meta-llama/Llama-2-7b-hf" 50 &
+
+# 例: カスタムプロンプトを使用する場合
+# (第9引数にプロンプトファイルのパスを指定)
+./cmd/run_bigrec_train.sh movie 0 0 1024 128 128 "Qwen/Qwen2-0.5B" 50 "my_templates/custom_prompt.txt"
+
 ```
 
 ### 5. BIGRecの推論
@@ -125,8 +131,8 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 vLLMを使用して推論を高速に実行します。
 
 ```bash
-# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size> <limit>
-# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1
+# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size> <limit> <prompt_file>
+# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 ""
 
 # 例: 基本的な実行（デフォルト設定）
 ./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B"
@@ -137,6 +143,10 @@ vLLMを使用して推論を高速に実行します。
 
 # 例: train.json 全件を実行（本番用）
 ./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "train.json" 16 -1
+
+# 例: カスタムプロンプトを使用して推論する場合
+# (第10引数にプロンプトファイルのパスを指定)
+./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "my_templates/inference_prompt.txt"
 ```
 
 ### 6. データ転送

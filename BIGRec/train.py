@@ -56,10 +56,8 @@ def train(
     wandb_run_name: str = "",
     wandb_watch: str = "",  # options: false | gradients | all
     wandb_log_model: str = "",  # options: false | true
-    wandb_log_model: str = "",  # options: false | true
     resume_from_checkpoint: str = None,  # either training checkpoint or final adapter
     prompt_file: str = None,
-):
 ):
     print(
         f"Training Alpaca-LoRA model with params:\n"
