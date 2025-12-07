@@ -27,7 +27,7 @@ else:
     for root, dirs, files in os.walk(args.input_dir):
         for name in files:
             if name.endswith(".json") and "metrics.json" not in name:
-                if "test" in name or "valid" in name:
+                if "test" in name or "valid" in name or "train" in name:
                     path.append(os.path.join(args.input_dir, name))
 print(path)
 base_model = args.base_model

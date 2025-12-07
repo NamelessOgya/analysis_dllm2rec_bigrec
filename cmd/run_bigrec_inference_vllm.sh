@@ -26,6 +26,25 @@ DATA_DIR="BIGRec/data/$DATASET"
 TEST_DATA_PATH="$DATA_DIR/$TEST_DATA"
 RESULT_JSON_PATH="$RESULT_DIR/$TEST_DATA"
 
+# Special handling for "all" or "valid_test"
+if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
+    TEST_DATA_PATH="$TEST_DATA"
+    RESULT_JSON_PATH="$RESULT_DIR" # Output to directory
+    
+    # Pass dataset argument required by inference_vllm.py for these modes
+    EXTRA_ARGS="--dataset $DATASET"
+else
+    # Check if test data exists (only for specific files)
+    if [ ! -f "$TEST_DATA_PATH" ]; then
+        echo "Error: Test data not found at $TEST_DATA_PATH"
+        echo "Please run data preprocessing first (e.g., ./cmd/run_preprocess_data.sh $DATASET)."
+        exit 1
+    fi
+    EXTRA_ARGS=""
+fi
+
+# ... (rest of script) ...
+
 # Construct LoRA weights path
 LORA_WEIGHTS="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 
@@ -36,13 +55,6 @@ mkdir -p "$RESULT_DIR"
 if [ ! -d "$LORA_WEIGHTS" ]; then
     echo "Error: LoRA weights not found at $LORA_WEIGHTS"
     echo "Please check your arguments (dataset, model, seed, sample) or run training first."
-    exit 1
-fi
-
-# Check if test data exists
-if [ ! -f "$TEST_DATA_PATH" ]; then
-    echo "Error: Test data not found at $TEST_DATA_PATH"
-    echo "Please run data preprocessing first (e.g., ./cmd/run_preprocess_data.sh $DATASET)."
     exit 1
 fi
 
@@ -86,21 +98,31 @@ else
         --result_json_data "$RESULT_JSON_PATH" \
         --batch_size "$BATCH_SIZE" \
         --tensor_parallel_size "$NUM_GPUS" \
-        --limit "$LIMIT"
+        --limit "$LIMIT" \
+        $EXTRA_ARGS
 fi
 
 echo "Inference completed (or skipped). Running evaluation..."
 
 # Run evaluation
-# Explicitly pass --input_file to ensure the just-generated file is processed
-# This bypasses the name filter in evaluate.py that might ignore "train.json"
-CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
-    --input_dir "$RESULT_DIR" \
-    --base_model "$BASE_MODEL" \
-    --embedding_path "$EMBEDDING_FILE" \
-    --save_results \
-    --batch_size "$BATCH_SIZE" \
-    --input_file "$RESULT_JSON_PATH"
+if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
+    # Directory mode
+    CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
+        --input_dir "$RESULT_DIR" \
+        --base_model "$BASE_MODEL" \
+        --embedding_path "$EMBEDDING_FILE" \
+        --save_results \
+        --batch_size "$BATCH_SIZE" 
+else
+    # Single file mode
+    CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
+        --input_dir "$RESULT_DIR" \
+        --base_model "$BASE_MODEL" \
+        --embedding_path "$EMBEDDING_FILE" \
+        --save_results \
+        --batch_size "$BATCH_SIZE" \
+        --input_file "$RESULT_JSON_PATH"
+fi
 
 if [ -f "./${DATASET}.json" ]; then
     mv "./${DATASET}.json" "$RESULT_DIR/metrics.json"

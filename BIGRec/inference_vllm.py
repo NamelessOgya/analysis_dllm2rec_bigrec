@@ -167,7 +167,9 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
         )
         
         # Use beam_search method
-        outputs = llm.beam_search(prompts, beam_params)
+        # vLLM beam_search expects dict with "prompt" key or tokens
+        beam_prompts = [{"prompt": p} for p in prompts]
+        outputs = llm.beam_search(beam_prompts, beam_params)
         
         for i, output in enumerate(outputs):
             # output is BeamSearchOutput, contains 'sequences' which is List[BeamSearchSequence]

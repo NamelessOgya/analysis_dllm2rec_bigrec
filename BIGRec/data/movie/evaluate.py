@@ -24,7 +24,8 @@ for root, dirs, files in os.walk(args.input_dir):
         print(f"DEBUG: Checking file: {name}")
         if name.endswith(".json") and "metrics.json" not in name:
             print(f"DEBUG: Adding file to process: {name}")
-            path.append(os.path.join(args.input_dir, name))
+            if "test" in name or "valid" in name or "train" in name:
+                path.append(os.path.join(args.input_dir, name))
 print(f"DEBUG: Files to process: {path}")
 
 base_model = args.base_model
