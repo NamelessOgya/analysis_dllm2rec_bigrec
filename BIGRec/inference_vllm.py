@@ -2,6 +2,14 @@ import fire
 import json
 import os
 from vllm import LLM, SamplingParams
+try:
+    from vllm import BeamSearchParams
+except ImportError:
+    try:
+        from vllm.sampling_params import BeamSearchParams
+    except ImportError:
+        BeamSearchParams = None
+
 from vllm.lora.request import LoRARequest
 from tqdm import tqdm
 
@@ -41,12 +49,14 @@ def main(
     num_beams: int = 4,
     tensor_parallel_size: int = 1,
     dataset: str = None,
+    limit: int = -1,
 ):
     assert base_model, "Please specify a --base_model"
 
     print(f"DEBUG: Loading vLLM model {base_model}...")
     enable_lora = bool(lora_weights)
     
+    # vLLM 0.12.0 optimization settings
     llm = LLM(
         model=base_model,
         enable_lora=enable_lora,
@@ -54,8 +64,11 @@ def main(
         trust_remote_code=True,
         max_lora_rank=64,
         gpu_memory_utilization=0.9,
+        max_model_len=512,
+        max_num_batched_tokens=8192,
+        enable_prefix_caching=True,
     )
-    print("DEBUG: vLLM model loaded.")
+    print("DEBUG: vLLM model loaded with optimization settings.")
 
     lora_request = None
     if enable_lora:
@@ -139,29 +152,43 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
         input_text = item['input']
         prompts.append(generate_prompt(instruction, input_text))
     
+    print(f"DEBUG: Starting generation...")
+    
     if num_beams > 1:
-        sampling_params = SamplingParams(
-            temperature=0, 
+        if BeamSearchParams is None:
+            raise ImportError("BeamSearchParams not found. Please check vLLM version (0.12.0+ required for this implementation).")
+        
+        print(f"DEBUG: Using Beam Search with BeamSearchParams (width={num_beams})")
+        beam_params = BeamSearchParams(
+            beam_width=num_beams,
             max_tokens=max_new_tokens,
-            best_of=num_beams,
-            n=num_beams, 
+            temperature=temperature,
+            ignore_eos=False 
         )
+        
+        # Use beam_search method
+        outputs = llm.beam_search(prompts, beam_params)
+        
+        for i, output in enumerate(outputs):
+            # output is BeamSearchOutput, contains 'sequences' which is List[BeamSearchSequence]
+            # BeamSearchSequence has 'text'
+            generated_texts = ["the recommended game is " + seq.text for seq in output.sequences]
+            test_data[i]['predict'] = generated_texts
+            
     else:
+        print(f"DEBUG: Using Sampling (greedy/sampling)")
         sampling_params = SamplingParams(
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
             max_tokens=max_new_tokens,
-            n=num_beams,
-            best_of=num_beams,
         )
 
-    print(f"DEBUG: Starting generation...")
-    outputs = llm.generate(prompts, sampling_params, lora_request=lora_request)
-    
-    for i, output in enumerate(outputs):
-        generated_texts = ["the recommended game is " + o.text for o in output.outputs]
-        test_data[i]['predict'] = generated_texts
+        outputs = llm.generate(prompts, sampling_params, lora_request=lora_request)
+        
+        for i, output in enumerate(outputs):
+            generated_texts = ["the recommended game is " + o.text for o in output.outputs]
+            test_data[i]['predict'] = generated_texts
 
     print("DEBUG: Generation complete.")
 

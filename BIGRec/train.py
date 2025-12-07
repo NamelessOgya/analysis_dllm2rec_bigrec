@@ -246,7 +246,7 @@ def train(
             eval_strategy="epoch",
             save_strategy="epoch",
             output_dir=output_dir,
-            save_total_limit=1,
+            save_total_limit=None,
             load_best_model_at_end=True,
             ddp_find_unused_parameters=False if ddp else None,
             group_by_length=group_by_length,
@@ -272,6 +272,55 @@ def train(
     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+
+    # Save best model with epoch info
+    if trainer.state.best_model_checkpoint:
+        best_checkpoint_path = trainer.state.best_model_checkpoint
+        best_metric = trainer.state.best_metric 
+        
+        try:
+            # Try to find epoch from log history
+            # Checkpoint directory is usually "checkpoint-X"
+            best_step = int(best_checkpoint_path.split('-')[-1])
+            best_epoch = None
+            
+            # log_history is a list of dicts. We search for the entry corresponding to the best step.
+            for entry in trainer.state.log_history:
+                if entry.get("step") == best_step and "epoch" in entry:
+                    best_epoch = entry["epoch"]
+                    break
+            
+            if best_epoch is None:
+                # If not found in log history, try to estimate or fallback
+                best_epoch = "unknown"
+            
+            # Format epoch for directory name
+            if isinstance(best_epoch, (int, float)):
+                best_epoch_str = f"{int(best_epoch)}"
+            else:
+                best_epoch_str = str(best_epoch)
+                
+            best_model_dir = os.path.join(output_dir, f"best_model_epoch_{best_epoch_str}")
+            
+            if not os.path.exists(best_model_dir):
+                os.makedirs(best_model_dir)
+
+            print(f"Saving best model (step {best_step}, epoch {best_epoch_str}) to {best_model_dir}")
+            model.save_pretrained(best_model_dir)
+            tokenizer.save_pretrained(best_model_dir)
+            
+            # Also save a summary json
+            import json
+            with open(os.path.join(output_dir, "training_summary.json"), "w") as f:
+                json.dump({
+                    "best_model_checkpoint": best_checkpoint_path,
+                    "best_metric": best_metric,
+                    "best_step": best_step,
+                    "best_epoch": best_epoch,
+                }, f, indent=4)
+        except Exception as e:
+            print(f"Error saving best model with epoch info: {e}")
 
     print(
         "\n If there's a warning about missing keys above, please disregard :)"
