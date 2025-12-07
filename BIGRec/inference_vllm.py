@@ -13,10 +13,15 @@ except ImportError:
 from vllm.lora.request import LoRARequest
 from tqdm import tqdm
 
-def generate_prompt(instruction, input=None):
+def generate_prompt(instruction, input=None, prompt_file=None):
     # Read templates from files - aligned with BIGRec/inference.py
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    template_path = os.path.join(script_dir, "templates", "prompt_template.txt")
+    
+    if prompt_file:
+         template_path = prompt_file
+    else:
+         template_path = os.path.join(script_dir, "templates", "prompt_template.txt")
+
     template_no_input_path = os.path.join(script_dir, "templates", "prompt_template_no_input.txt")
 
     if input:
@@ -50,6 +55,7 @@ def main(
     tensor_parallel_size: int = 1,
     dataset: str = None,
     limit: int = -1,
+    prompt_file: str = None,
 ):
     assert base_model, "Please specify a --base_model"
 
@@ -130,10 +136,11 @@ def main(
             top_k, 
             max_new_tokens,
             limit,
-            batch_size
+            batch_size,
+            prompt_file
         )
 
-def process_file(llm, input_path, output_path, lora_request, num_beams, temperature, top_p, top_k, max_new_tokens, limit, batch_size):
+def process_file(llm, input_path, output_path, lora_request, num_beams, temperature, top_p, top_k, max_new_tokens, limit, batch_size, prompt_file=None):
     print(f"DEBUG: Processing {input_path} -> {output_path}")
     
     if not os.path.exists(input_path):
@@ -151,7 +158,7 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
     for item in test_data:
         instruction = item['instruction']
         input_text = item['input']
-        prompts.append(generate_prompt(instruction, input_text))
+        prompts.append(generate_prompt(instruction, input_text, prompt_file))
     
     print(f"DEBUG: Starting generation...")
     

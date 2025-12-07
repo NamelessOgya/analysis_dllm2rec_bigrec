@@ -13,6 +13,7 @@ SKIP_INFERENCE=${6:-false}
 TEST_DATA=${7:-"test_5000.json"}
 BATCH_SIZE=${8:-16} # Kept for compatibility, though vLLM manages it internally
 LIMIT=${9:--1}      # New argument: Limit number of items to process (-1 for all)
+PROMPT_FILE=${10:-""}
 
 echo "Running BIGRec inference (vLLM) for dataset: $DATASET"
 
@@ -99,6 +100,7 @@ else
         --batch_size "$BATCH_SIZE" \
         --tensor_parallel_size "$NUM_GPUS" \
         --limit "$LIMIT" \
+        $( [ -n "$PROMPT_FILE" ] && echo "--prompt_file $PROMPT_FILE" ) \
         $EXTRA_ARGS
 fi
 

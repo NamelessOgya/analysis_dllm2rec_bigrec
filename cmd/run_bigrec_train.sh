@@ -12,6 +12,7 @@ BATCH_SIZE=${5:-128}
 MICRO_BATCH_SIZE=${6:-4}
 BASE_MODEL=${7:-"Qwen/Qwen2-0.5B"}
 NUM_EPOCHS=${8:-50}
+PROMPT_FILE=${9:-""}
 
 echo "Running BIGRec training for dataset: $DATASET"
 
@@ -56,7 +57,8 @@ if [ "$NUM_GPUS" -gt 1 ]; then
         --train_on_inputs \
         --group_by_length \
         --seed $SEED \
-        --sample $SAMPLE
+        --sample $SAMPLE \
+        $( [ -n "$PROMPT_FILE" ] && echo "--prompt_file $PROMPT_FILE" )
 else
     echo "Using single GPU training."
     CUDA_VISIBLE_DEVICES=$GPU_ID python train.py \
@@ -76,7 +78,8 @@ else
         --train_on_inputs \
         --group_by_length \
         --seed $SEED \
-        --sample $SAMPLE
+        --sample $SAMPLE \
+        $( [ -n "$PROMPT_FILE" ] && echo "--prompt_file $PROMPT_FILE" )
 fi
 
 duration=$SECONDS
