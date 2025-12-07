@@ -46,7 +46,7 @@ def main(
     temperature: float = 0,
     top_p: float = 0.9,
     top_k: int = 40,
-    num_beams: int = 4,
+    num_beams: int = 1,
     tensor_parallel_size: int = 1,
     dataset: str = None,
     limit: int = -1,
@@ -195,7 +195,7 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
                 test_data[global_start_idx + j]['predict'] = generated_texts
             
     else:
-        print(f"DEBUG: Using Sampling (greedy/sampling)")
+        print(f"DEBUG: Using Sampling (greedy/sampling) with native progress bar")
         sampling_params = SamplingParams(
             temperature=temperature,
             top_p=top_p,
@@ -203,13 +203,12 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
             max_tokens=max_new_tokens,
         )
 
-        for i, batch_prompts in tqdm(enumerate(get_batches(prompts, eff_batch_size)), total=total_batches, desc="Inference Batches"):
-            outputs = llm.generate(batch_prompts, sampling_params, lora_request=lora_request)
-            
-            global_start_idx = i * eff_batch_size
-            for j, output in enumerate(outputs):
-                generated_texts = ["the recommended game is " + o.text for o in output.outputs]
-                test_data[global_start_idx + j]['predict'] = generated_texts
+        # Use direct generation for native progress bar support
+        outputs = llm.generate(prompts, sampling_params, lora_request=lora_request)
+        
+        for i, output in enumerate(outputs):
+            generated_texts = ["the recommended game is " + o.text for o in output.outputs]
+            test_data[i]['predict'] = generated_texts
 
     print("DEBUG: Generation complete.")
 
