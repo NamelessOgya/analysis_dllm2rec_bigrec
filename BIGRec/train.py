@@ -265,12 +265,7 @@ def train(
     )
     model.config.use_cache = False
 
-    old_state_dict = model.state_dict
-    model.state_dict = (
-        lambda self, *_, **__: get_peft_model_state_dict(
-            self, old_state_dict()
-        )
-    ).__get__(model, type(model))
+    # model.state_dict override removed to fix empty weights issue with modern PEFT
 
     if torch.__version__ >= "2" and sys.platform != "win32":
         model = torch.compile(model)
@@ -327,6 +322,8 @@ def train(
                 }, f, indent=4)
         except Exception as e:
             print(f"Error saving best model with epoch info: {e}")
+    else:
+        print("Warning: trainer.state.best_model_checkpoint is None. Best model might not have been tracked correctly.")
 
     print(
         "\n If there's a warning about missing keys above, please disregard :)"
