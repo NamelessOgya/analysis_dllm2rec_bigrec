@@ -14,6 +14,7 @@ parse.add_argument("--save_results", action="store_true", help="save ranking res
 parse.add_argument("--topk", type=int, default=200, help="topk for saving results")
 parse.add_argument("--batch_size", type=int, default=16, help="batch size for embedding generation")
 parse.add_argument("--input_file", type=str, default=None, help="specific input file to process")
+parse.add_argument("--use_embedding_model", action="store_true", help="Use dedicated embedding model (e.g. E5)")
 args = parse.parse_args()
 
 path = []
@@ -31,20 +32,16 @@ else:
                     path.append(os.path.join(args.input_dir, name))
 print(path)
 base_model = args.base_model
-print(f"DEBUG: Loading tokenizer from {base_model}...")
-try:
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
-except:
-    from transformers import LlamaTokenizer
-    tokenizer = LlamaTokenizer.from_pretrained(base_model)
-print("DEBUG: Tokenizer loaded. Loading model...")
-model = AutoModelForCausalLM.from_pretrained(
-    base_model,
-    torch_dtype=torch.float16,
-    device_map="auto",
-)
-print("DEBUG: Model loaded.")
+# Import utils
+import sys
+import os
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(script_dir, "..", "..", "..")) # Path to BIGRec root
+from BIGRec.data.utils import get_embedding_model, generate_embeddings
 
+print(f"DEBUG: Loading model {base_model} (Use Embedding Model: {args.use_embedding_model})...")
+model, tokenizer = get_embedding_model(base_model, args.use_embedding_model)
+print("DEBUG: Model loaded.")
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 f = open(os.path.join(script_dir, 'id2name.txt'), 'r')
@@ -63,11 +60,7 @@ for p in path:
         "NDCG": [],
         "HR": [],
     }
-    model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
-    model.config.bos_token_id = 1
-    model.config.eos_token_id = 2
-    print("DEBUG: Setting model to eval mode...")
-    model.eval()
+    
     print("DEBUG: Reading test data from file...")
     f = open(p, 'r')
     import json
@@ -84,26 +77,15 @@ for p in path:
         continue
 
     text = [_["predict"][0].strip("\"") for _ in test_data]
-    tokenizer.padding_side = "left"
-
-    def batch(list, batch_size=1):
-        chunk_size = (len(list) - 1) // batch_size + 1
-        for i in range(chunk_size):
-            yield list[batch_size * i: batch_size * (i + 1)]
-    predict_embeddings = []
-    from tqdm import tqdm
-    print("DEBUG: Starting embedding generation loop...")
-    batch_size = args.batch_size
-    total_batches = (len(text) - 1) // batch_size + 1
-    for i, batch_input in tqdm(enumerate(batch(text, batch_size)), total=total_batches):
-        input = tokenizer(batch_input, return_tensors="pt", padding=True)
-        input_ids = input.input_ids.to(model.device)
-        attention_mask = input.attention_mask.to(model.device)
-        outputs = model(input_ids, attention_mask=attention_mask, output_hidden_states=True)
-        hidden_states = outputs.hidden_states
-        predict_embeddings.append(hidden_states[-1][:, -1, :].detach().cpu())
     
-    predict_embeddings = torch.cat(predict_embeddings, dim=0)
+    print("DEBUG: Generating prediction embeddings...")
+    predict_embeddings = generate_embeddings(
+        text, 
+        model, 
+        tokenizer, 
+        batch_size=args.batch_size, 
+        use_embedding_model=args.use_embedding_model
+    )
     
     if args.embedding_path:
         embedding_file = args.embedding_path

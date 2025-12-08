@@ -4,6 +4,7 @@
 set -e
 
 # Arguments
+# Arguments
 DATASET=${1:-movie}
 GPU_ID=${2:-0}
 BASE_MODEL=${3:-"Qwen/Qwen2-0.5B"}
@@ -14,6 +15,7 @@ TEST_DATA=${7:-"test_5000.json"}
 BATCH_SIZE=${8:-16} # Kept for compatibility, though vLLM manages it internally
 LIMIT=${9:--1}      # New argument: Limit number of items to process (-1 for all)
 PROMPT_FILE=${10:-""}
+USE_EMBEDDING_MODEL=${11:-false}
 
 echo "Running BIGRec inference (vLLM) for dataset: $DATASET"
 
@@ -44,8 +46,6 @@ else
     EXTRA_ARGS=""
 fi
 
-# ... (rest of script) ...
-
 # Construct LoRA weights path
 LORA_WEIGHTS="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 
@@ -62,17 +62,32 @@ fi
 echo "Using LoRA weights from: $LORA_WEIGHTS"
 echo "Outputting results to: $RESULT_DIR"
 
+# Configure Embedding Model
+if [ "$USE_EMBEDDING_MODEL" = "true" ]; then
+    EVAL_MODEL="intfloat/multilingual-e5-large"
+    SAFE_EVAL_MODEL_NAME=$(echo "$EVAL_MODEL" | tr '/' '_')
+    EXTRA_EMBED_ARGS="--use_embedding_model"
+    echo "Using dedicated embedding model: $EVAL_MODEL"
+else
+    EVAL_MODEL="$BASE_MODEL"
+    SAFE_EVAL_MODEL_NAME=$(echo "$EVAL_MODEL" | tr '/' '_')
+    EXTRA_EMBED_ARGS=""
+    echo "Using base model for embeddings: $EVAL_MODEL"
+fi
+
 # Check if item embedding file exists
 EMBEDDING_DIR="BIGRec/data/$DATASET/model_embeddings"
-EMBEDDING_FILE="$EMBEDDING_DIR/${SAFE_MODEL_NAME}.pt"
+EMBEDDING_FILE="$EMBEDDING_DIR/${SAFE_EVAL_MODEL_NAME}.pt"
 
 if [ ! -f "$EMBEDDING_FILE" ]; then
     echo "Item embedding file not found at $EMBEDDING_FILE"
     echo "Generating item embeddings..."
-    CUDA_VISIBLE_DEVICES=$GPU_ID python BIGRec/data/generate_embeddings.py \
+    export CUDA_VISIBLE_DEVICES=$GPU_ID
+    python BIGRec/data/generate_embeddings.py \
         --dataset "$DATASET" \
-        --base_model "$BASE_MODEL" \
-        --output_path "$EMBEDDING_FILE"
+        --base_model "$EVAL_MODEL" \
+        --output_path "$EMBEDDING_FILE" \
+        $EXTRA_EMBED_ARGS
     
     if [ ! -f "$EMBEDDING_FILE" ]; then
         echo "Error: Failed to generate item embeddings."
@@ -111,19 +126,21 @@ if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
     # Directory mode
     CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
         --input_dir "$RESULT_DIR" \
-        --base_model "$BASE_MODEL" \
+        --base_model "$EVAL_MODEL" \
         --embedding_path "$EMBEDDING_FILE" \
         --save_results \
-        --batch_size "$BATCH_SIZE" 
+        --batch_size "$BATCH_SIZE" \
+        $EXTRA_EMBED_ARGS
 else
     # Single file mode
     CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
         --input_dir "$RESULT_DIR" \
-        --base_model "$BASE_MODEL" \
+        --base_model "$EVAL_MODEL" \
         --embedding_path "$EMBEDDING_FILE" \
         --save_results \
         --batch_size "$BATCH_SIZE" \
-        --input_file "$RESULT_JSON_PATH"
+        --input_file "$RESULT_JSON_PATH" \
+        $EXTRA_EMBED_ARGS
 fi
 
 if [ -f "./${DATASET}.json" ]; then

@@ -4,6 +4,7 @@
 set -e
 
 # Arguments
+# Arguments
 DATASET=${1:-movie}
 GPU_ID=${2:-0}
 BASE_MODEL=${3:-"Qwen/Qwen2-0.5B"}
@@ -13,6 +14,7 @@ SKIP_INFERENCE=${6:-false}
 TARGET_SPLIT=${7:-"valid_test"}
 BATCH_SIZE=${8:-16}
 DEBUG_LIMIT=${9:--1}
+USE_EMBEDDING_MODEL=${10:-false}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
@@ -51,17 +53,31 @@ if [ ! -d "$LORA_WEIGHTS" ]; then
     exit 1
 fi
 
+# Configure Embedding Model
+if [ "$USE_EMBEDDING_MODEL" = "true" ]; then
+    EVAL_MODEL="intfloat/multilingual-e5-large"
+    SAFE_EVAL_MODEL_NAME=$(echo "$EVAL_MODEL" | tr '/' '_')
+    EXTRA_EMBED_ARGS="--use_embedding_model"
+    echo "Using dedicated embedding model: $EVAL_MODEL"
+else
+    EVAL_MODEL="$BASE_MODEL"
+    SAFE_EVAL_MODEL_NAME=$(echo "$EVAL_MODEL" | tr '/' '_')
+    EXTRA_EMBED_ARGS=""
+    echo "Using base model for embeddings: $EVAL_MODEL"
+fi
+
 # Check if item embedding file exists
 EMBEDDING_DIR="BIGRec/data/$DATASET/model_embeddings"
-EMBEDDING_FILE="$EMBEDDING_DIR/${SAFE_MODEL_NAME}.pt"
+EMBEDDING_FILE="$EMBEDDING_DIR/${SAFE_EVAL_MODEL_NAME}.pt"
 
 if [ ! -f "$EMBEDDING_FILE" ]; then
     echo "Item embedding file not found at $EMBEDDING_FILE"
     echo "Generating item embeddings..."
     CUDA_VISIBLE_DEVICES=$GPU_ID python BIGRec/data/generate_embeddings.py \
         --dataset "$DATASET" \
-        --base_model "$BASE_MODEL" \
-        --output_path "$EMBEDDING_FILE"
+        --base_model "$EVAL_MODEL" \
+        --output_path "$EMBEDDING_FILE" \
+        $EXTRA_EMBED_ARGS
     
     if [ ! -f "$EMBEDDING_FILE" ]; then
         echo "Error: Failed to generate item embeddings."
@@ -123,10 +139,11 @@ with open(path, 'w') as f: json.dump(data, f, indent=4)"
     SECONDS=0
     CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
         --input_file "$RESULT_JSON_PATH" \
-        --base_model "$BASE_MODEL" \
+        --base_model "$EVAL_MODEL" \
         --embedding_path "$EMBEDDING_FILE" \
         --save_results \
-        --batch_size "$BATCH_SIZE"
+        --batch_size "$BATCH_SIZE" \
+        $EXTRA_EMBED_ARGS
     duration=$SECONDS
     duration_min=$(($duration / 60))
     echo "Teacher model accuracy evaluation time: $duration_min minutes"

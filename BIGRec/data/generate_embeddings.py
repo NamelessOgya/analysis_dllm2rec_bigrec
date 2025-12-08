@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from tqdm import tqdm
@@ -10,17 +11,16 @@ def parse_args():
     parser.add_argument("--base_model", type=str, required=True, help="Base model path")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for inference")
     parser.add_argument("--output_path", type=str, required=True, help="Output path for embeddings")
+    parser.add_argument("--use_embedding_model", action="store_true", help="Use dedicated embedding model (e.g. E5)")
+    parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     return parser.parse_args()
-
-def batch(list, batch_size=1):
-    chunk_size = (len(list) - 1) // batch_size + 1
-    for i in range(chunk_size):
-        yield list[batch_size * i: batch_size * (i + 1)]
 
 def main():
     args = parse_args()
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.append(os.path.join(script_dir, "..", "..")) # Add root project dir 
+    from BIGRec.data.utils import get_embedding_model, generate_embeddings
     
     # Determine paths based on dataset
     if args.dataset == "movie":
@@ -42,6 +42,7 @@ def main():
     print(f"Input file: {input_file}")
     print(f"Output file: {output_file}")
     print(f"Base model: {args.base_model}")
+    print(f"Use embedding model: {args.use_embedding_model}")
     
     # Load items
     items = []
@@ -49,7 +50,6 @@ def main():
         with open(input_file, 'r', encoding='ISO-8859-1') as f:
             lines = f.readlines()
             # Format: MovieID::Title::Genres
-            # We extract Title. strip("\"") removes surrounding quotes if present.
             items = [line.split('::')[1].strip("\"") for line in lines]
     elif args.dataset in ["game", "game_bigrec"]:
         with open(input_file, 'r') as f:
@@ -61,41 +61,17 @@ def main():
     
     # Load model and tokenizer
     print("Loading model and tokenizer...")
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(args.base_model)
-    except:
-        from transformers import LlamaTokenizer
-        tokenizer = LlamaTokenizer.from_pretrained(args.base_model)
-    tokenizer.padding_side = "left"
-    
-    model = AutoModelForCausalLM.from_pretrained(
-        args.base_model,
-        torch_dtype=torch.float16,
-        device_map="auto",
-    )
-    
-    model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
-    model.config.bos_token_id = 1
-    model.config.eos_token_id = 2
-    model.eval()
+    model, tokenizer = get_embedding_model(args.base_model, args.use_embedding_model)
     
     # Generate embeddings
-    item_embeddings = []
-    print("Starting embedding generation...")
+    item_embeddings = generate_embeddings(
+        items, 
+        model, 
+        tokenizer, 
+        batch_size=args.batch_size, 
+        use_embedding_model=args.use_embedding_model
+    )
     
-    with torch.no_grad():
-        for i, batch_input in tqdm(enumerate(batch(items, args.batch_size))):
-            input = tokenizer(batch_input, return_tensors="pt", padding=True)
-            input_ids = input.input_ids.to(model.device)
-            attention_mask = input.attention_mask.to(model.device)
-            
-            outputs = model(input_ids, attention_mask=attention_mask, output_hidden_states=True)
-            hidden_states = outputs.hidden_states
-            # Use the last hidden state of the last token
-            embedding = hidden_states[-1][:, -1, :].detach().cpu()
-            item_embeddings.append(embedding)
-            
-    item_embeddings = torch.cat(item_embeddings, dim=0)
     print(f"Generated embeddings shape: {item_embeddings.shape}")
     
     # Save embeddings
