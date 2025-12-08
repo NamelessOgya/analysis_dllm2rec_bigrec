@@ -15,6 +15,8 @@ parse.add_argument("--save_results", action="store_true", help="save ranking res
 parse.add_argument("--topk", type=int, default=200, help="topk for saving results")
 parse.add_argument("--batch_size", type=int, default=16, help="batch size for embedding generation")
 parse.add_argument("--use_embedding_model", action="store_true", help="Use dedicated embedding model (e.g. E5)")
+parse.add_argument("--popularity_file", type=str, default=None, help="Path to popularity count json file")
+parse.add_argument("--popularity_gamma", type=float, default=0.0, help="Gamma value for popularity adjustment")
 args = parse.parse_args()
 print(f"DEBUG: evaluate.py started")
 print(f"DEBUG: Arguments: {args}")
@@ -83,8 +85,43 @@ for p in path:
     dist = torch.cdist(predict_embeddings, movie_embedding, p=2)
         
     
+
     rank = dist
-    rank = rank.argsort(dim = -1).argsort(dim = -1)
+    
+    # Popularity Adjustment (PDA)
+    if args.popularity_file and args.popularity_gamma > 0:
+        print(f"DEBUG: Applying popularity adjustment with gamma={args.popularity_gamma}")
+        try:
+            with open(args.popularity_file, 'r') as f_pop:
+                pop_count = json.load(f_pop)
+            
+            # Create pop_rank tensor aligned with item_ids
+            # movie_dict maps name -> id
+            num_items = len(movie_dict)
+            pop_rank = torch.zeros(num_items)
+            
+            for item_name, count in pop_count.items():
+                if item_name in movie_dict:
+                    idx = movie_dict[item_name]
+                    pop_rank[idx] = count
+            
+            # Standard normalization
+            if pop_rank.sum() > 0:
+                 pop_rank = pop_rank / pop_rank.sum()
+                 min_val = pop_rank.min()
+                 max_val = pop_rank.max()
+                 if max_val - min_val > 0:
+                     pop_rank = (pop_rank - min_val) / (max_val - min_val)
+            
+            # Move to GPU and reshape to broadcast
+            pop_rank = pop_rank.to(dist.device).unsqueeze(0) # [1, num_items]
+            
+            rank = torch.pow((1 + pop_rank), -args.popularity_gamma) * dist
+            
+        except Exception as e:
+            print(f"WARNING: Failed to apply popularity adjustment: {e}")
+
+    rank_indices = rank.argsort(dim = -1).argsort(dim = -1)
 
     topk_list = [1, 3, 5, 10, 20, 50]
     NDCG = []
@@ -93,7 +130,7 @@ for p in path:
         for i in range(len(test_data)):
             target_movie = test_data[i]['output'].strip("\"")
             target_movie_id = movie_dict[target_movie]
-            rankId = rank[i][target_movie_id].item()
+            rankId = rank_indices[i][target_movie_id].item()
             if rankId < topk:
                 S = S + (1 / math.log(rankId + 2))
         NDCG.append(S / len(test_data) / (1 / math.log(2)))
@@ -103,7 +140,7 @@ for p in path:
         for i in range(len(test_data)):
             target_movie = test_data[i]['output'].strip("\"")
             target_movie_id = movie_dict[target_movie]
-            rankId = rank[i][target_movie_id].item()
+            rankId = rank_indices[i][target_movie_id].item()
             if rankId < topk:
                 S = S + 1
         HR.append(S / len(test_data))

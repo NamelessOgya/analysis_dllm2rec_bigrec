@@ -16,6 +16,8 @@ BATCH_SIZE=${8:-16} # Kept for compatibility, though vLLM manages it internally
 LIMIT=${9:--1}      # New argument: Limit number of items to process (-1 for all)
 PROMPT_FILE=${10:-""}
 USE_EMBEDDING_MODEL=${11:-false}
+USE_POPULARITY=${12:-false}
+POPULARITY_GAMMA=${13:-0.0}
 
 echo "Running BIGRec inference (vLLM) for dataset: $DATASET"
 
@@ -121,6 +123,28 @@ fi
 
 echo "Inference completed (or skipped). Running evaluation..."
 
+# Popularity Arguments Setup
+POP_ARGS=""
+if [ "$USE_POPULARITY" = "true" ]; then
+    POP_FILE="BIGRec/data/$DATASET/pop_count.json"
+    
+    # Check and generate if missing
+    if [ ! -f "$POP_FILE" ]; then
+        echo "Popularity file $POP_FILE not found. Generating..."
+        if [ -f "$DATA_DIR/train.json" ]; then
+            python BIGRec/data/create_pop_file.py --train_file "$DATA_DIR/train.json" --output_file "$POP_FILE"
+            echo "Generated $POP_FILE"
+        else
+            echo "WARNING: Cannot generate popularity file. train.json not found in $DATA_DIR."
+        fi
+    fi
+    
+    if [ -f "$POP_FILE" ]; then
+            POP_ARGS="--popularity_file $POP_FILE --popularity_gamma $POPULARITY_GAMMA"
+            echo "Using Popularity Adjustment with gamma=$POPULARITY_GAMMA"
+    fi
+fi
+
 # Run evaluation
 if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
     # Directory mode
@@ -130,7 +154,7 @@ if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
         --embedding_path "$EMBEDDING_FILE" \
         --save_results \
         --batch_size "$BATCH_SIZE" \
-        $EXTRA_EMBED_ARGS
+        $EXTRA_EMBED_ARGS $POP_ARGS
 else
     # Single file mode
     CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
@@ -140,7 +164,7 @@ else
         --save_results \
         --batch_size "$BATCH_SIZE" \
         --input_file "$RESULT_JSON_PATH" \
-        $EXTRA_EMBED_ARGS
+        $EXTRA_EMBED_ARGS $POP_ARGS
 fi
 
 if [ -f "./${DATASET}.json" ]; then

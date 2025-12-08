@@ -15,6 +15,8 @@ TARGET_SPLIT=${7:-"valid_test"}
 BATCH_SIZE=${8:-16}
 DEBUG_LIMIT=${9:--1}
 USE_EMBEDDING_MODEL=${10:-false}
+USE_POPULARITY=${11:-false}
+POPULARITY_GAMMA=${12:-0.0}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
@@ -135,6 +137,28 @@ with open(path, 'w') as f: json.dump(data, f, indent=4)"
 
     echo "Inference completed (or skipped). Running evaluation..."
 
+    # Popularity Arguments Setup
+    POP_ARGS=""
+    if [ "$USE_POPULARITY" = "true" ]; then
+        POP_FILE="BIGRec/data/$DATASET/pop_count.json"
+        
+        # Check and generate if missing
+        if [ ! -f "$POP_FILE" ]; then
+            echo "Popularity file $POP_FILE not found. Generating..."
+            if [ -f "$DATA_DIR/train.json" ]; then
+                python BIGRec/data/create_pop_file.py --train_file "$DATA_DIR/train.json" --output_file "$POP_FILE"
+                echo "Generated $POP_FILE"
+            else
+                echo "WARNING: Cannot generate popularity file. train.json not found in $DATA_DIR."
+            fi
+        fi
+        
+        if [ -f "$POP_FILE" ]; then
+             POP_ARGS="--popularity_file $POP_FILE --popularity_gamma $POPULARITY_GAMMA"
+             echo "Using Popularity Adjustment with gamma=$POPULARITY_GAMMA"
+        fi
+    fi
+
     # Run evaluation
     SECONDS=0
     CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
@@ -143,7 +167,7 @@ with open(path, 'w') as f: json.dump(data, f, indent=4)"
         --embedding_path "$EMBEDDING_FILE" \
         --save_results \
         --batch_size "$BATCH_SIZE" \
-        $EXTRA_EMBED_ARGS
+        $EXTRA_EMBED_ARGS $POP_ARGS
     duration=$SECONDS
     duration_min=$(($duration / 60))
     echo "Teacher model accuracy evaluation time: $duration_min minutes"
