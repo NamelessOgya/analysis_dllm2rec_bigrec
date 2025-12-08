@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate item embeddings for BIGRec evaluation")
-    parser.add_argument("--dataset", type=str, required=True, choices=["movie", "game", "game_bigrec"], help="Dataset name")
+    parser.add_argument("--dataset", type=str, required=True, help="Dataset name")
     parser.add_argument("--base_model", type=str, required=True, help="Base model path")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for inference")
     parser.add_argument("--output_path", type=str, required=True, help="Output path for embeddings")
@@ -29,6 +29,9 @@ def main():
         input_file = os.path.join(script_dir, "game", "id2name.txt")
     elif args.dataset == "game_bigrec":
         input_file = os.path.join(script_dir, "game_bigrec", "id2name.txt")
+    else:
+        # Generic fallback for debug or other datasets
+        input_file = os.path.join(script_dir, args.dataset, "id2name.txt")
     
     output_file = args.output_path
     
@@ -51,10 +54,11 @@ def main():
             lines = f.readlines()
             # Format: MovieID::Title::Genres
             items = [line.split('::')[1].strip("\"") for line in lines]
-    elif args.dataset in ["game", "game_bigrec"]:
+    else:
+        # Fallback for game, game_bigrec, and custom datasets
+        # Assume standard id2name format: Title\tID
         with open(input_file, 'r') as f:
             lines = f.readlines()
-            # Format: Title\tID
             items = [line.split('\t')[0].strip("\"\n").strip(" ") for line in lines]
             
     print(f"Loaded {len(items)} items.")
