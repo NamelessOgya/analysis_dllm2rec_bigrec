@@ -162,6 +162,55 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
     
     print(f"DEBUG: Starting generation...")
     
+    # --- Deep LoRA Verification ---
+    if lora_request and len(prompts) > 0:
+        print("DEBUG: performing LoRA effectiveness check on first prompt...")
+        try:
+            # Create a localized SamplingParams for this test
+            # We import SamplingParams at top level, assuming it is available here
+            # We need logprobs to compare distributions
+            test_params = SamplingParams(temperature=0, max_tokens=1, logprobs=10)
+            
+            # 1. Generate without LoRA
+            output_base = llm.generate([prompts[0]], test_params, lora_request=None, use_tqdm=False)
+            
+            # 2. Generate with LoRA
+            output_lora = llm.generate([prompts[0]], test_params, lora_request=lora_request, use_tqdm=False)
+            
+            # Compare first token logprobs
+            # output is RequestOutput object
+            # output.outputs[0] is CompletionOutput
+            # .logprobs[0] is Dict[int, Logprob] for the first token
+            
+            base_logprobs = output_base[0].outputs[0].logprobs[0]
+            lora_logprobs = output_lora[0].outputs[0].logprobs[0]
+            
+            # Extract simple dict for comparison: {token_id: logprob_float}
+            base_dist = {k: v.logprob for k, v in base_logprobs.items()}
+            lora_dist = {k: v.logprob for k, v in lora_logprobs.items()}
+            
+            # Check for exact equality
+            is_identical = (base_dist == lora_dist)
+            
+            if is_identical:
+                print("\n" + "!"*80)
+                print("CRITICAL WARNING: LoRA output is EXACTLY IDENTICAL to Base model output.")
+                print("The LoRA adapter weights are NOT having any effect.")
+                print(f"Base Top 1: {list(base_dist.items())[0]}")
+                print(f"LoRA Top 1: {list(lora_dist.items())[0]}")
+                print("Possible causes:\n1. Adapter weights are zero/empty.\n2. Target modules mismatch.\n3. Adapter not loaded correctly.")
+                print("!"*80 + "\n")
+            else:
+                print("\n" + "="*80)
+                print("DEBUG: LoRA output differs from Base model. LoRA IS active.")
+                print(f"Base Top 1: {list(base_dist.items())[0]}")
+                print(f"LoRA Top 1: {list(lora_dist.items())[0]}")
+                print("="*80 + "\n")
+                
+        except Exception as e:
+            print(f"DEBUG: Failed to run LoRA verification check: {e}")
+    # ------------------------------
+    
     # Helper to chunk data
     def get_batches(lst, batch_size):
         for i in range(0, len(lst), batch_size):
