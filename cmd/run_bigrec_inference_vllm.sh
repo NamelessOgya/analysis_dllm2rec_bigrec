@@ -49,7 +49,24 @@ else
 fi
 
 # Construct LoRA weights path
-LORA_WEIGHTS="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+
+BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+LORA_WEIGHTS="$BASE_LORA_PATH"
+
+# Check for best model checkpoint
+if [ -d "$BASE_LORA_PATH" ]; then
+    # Find directory named best_model_epoch_*
+    # We use sort to pick the one with highest epoch if multiple exist (though training usually saves one 'best')
+    BEST_MODEL=$(find "$BASE_LORA_PATH" -maxdepth 1 -type d -name "best_model_epoch_*" | sort -V | tail -n 1)
+    
+    if [ -n "$BEST_MODEL" ]; then
+        echo "Found Best Model checkpoint: $BEST_MODEL"
+        LORA_WEIGHTS="$BEST_MODEL"
+    else
+        echo "Error: No best model checkpoint (best_model_epoch_*) found in $BASE_LORA_PATH"
+        exit 1
+    fi
+fi
 
 # Ensure result directory exists
 mkdir -p "$RESULT_DIR"
