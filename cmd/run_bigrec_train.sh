@@ -54,6 +54,7 @@ if [ "$NUM_GPUS" -gt 1 ]; then
         --lora_alpha 16 \
         --lora_dropout 0.05 \
         --lora_target_modules '[q_proj,v_proj]' \
+        --train_on_inputs \
         --group_by_length \
         --seed $SEED \
         --sample $SAMPLE \
@@ -74,6 +75,7 @@ else
         --lora_alpha 16 \
         --lora_dropout 0.05 \
         --lora_target_modules '[q_proj,v_proj]' \
+        --train_on_inputs \
         --group_by_length \
         --seed $SEED \
         --sample $SAMPLE \
