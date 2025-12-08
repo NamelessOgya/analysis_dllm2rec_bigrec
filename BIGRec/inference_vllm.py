@@ -201,7 +201,7 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
             for j, output in enumerate(outputs):
                 # output is BeamSearchOutput, contains 'sequences' which is List[BeamSearchSequence]
                 # BeamSearchSequence has 'text'
-                generated_texts = ["the recommended game is " + seq.text for seq in output.sequences]
+                generated_texts = [seq.text for seq in output.sequences]
                 test_data[global_start_idx + j]['predict'] = generated_texts
             
     else:
@@ -219,7 +219,7 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
             
             global_start_idx = i * eff_batch_size
             for j, output in enumerate(outputs):
-                generated_texts = ["the recommended game is " + o.text for o in output.outputs]
+                generated_texts = [o.text for o in output.outputs]
                 test_data[global_start_idx + j]['predict'] = generated_texts
 
     print("DEBUG: Generation complete.")

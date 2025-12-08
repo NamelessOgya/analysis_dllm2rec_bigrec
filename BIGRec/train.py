@@ -117,7 +117,11 @@ def train(
         device_map=device_map,
     )
     # model.set_tau(tau)
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(base_model)
+    except:
+        from transformers import LlamaTokenizer
+        tokenizer = LlamaTokenizer.from_pretrained(base_model)
 
     tokenizer.pad_token_id = (
         0  # unk. we want this to be different from the eos token

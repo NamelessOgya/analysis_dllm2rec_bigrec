@@ -17,7 +17,11 @@ for root, dirs, files in os.walk(args.input_dir):
 print(path)
 
 base_model = "YOUR_LLAMA_PATH"
-tokenizer = AutoTokenizer.from_pretrained(base_model)
+try:
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
+except:
+    from transformers import LlamaTokenizer
+    tokenizer = LlamaTokenizer.from_pretrained(base_model)
 model = AutoModelForCausalLM.from_pretrained(
     base_model,
     torch_dtype=torch.float16,

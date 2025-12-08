@@ -40,7 +40,11 @@ def main(
         base_model
     ), "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
 
-    tokenizer = AutoTokenizer.from_pretrained(base_model)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(base_model)
+    except:
+        from transformers import LlamaTokenizer
+        tokenizer = LlamaTokenizer.from_pretrained(base_model)
     if device == "cuda":
         print("DEBUG: Loading base model (cuda)...")
         model = AutoModelForCausalLM.from_pretrained(

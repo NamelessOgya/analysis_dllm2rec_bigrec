@@ -30,7 +30,11 @@ print(f"DEBUG: Files to process: {path}")
 
 base_model = args.base_model
 print(f"DEBUG: Loading tokenizer from {base_model}...")
-tokenizer = AutoTokenizer.from_pretrained(base_model)
+try:
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
+except:
+    from transformers import LlamaTokenizer
+    tokenizer = LlamaTokenizer.from_pretrained(base_model)
 print("DEBUG: Tokenizer loaded. Loading model...")
 model = AutoModelForCausalLM.from_pretrained(
     base_model,

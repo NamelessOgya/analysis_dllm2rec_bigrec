@@ -61,7 +61,11 @@ def main():
     
     # Load model and tokenizer
     print("Loading model and tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(args.base_model)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(args.base_model)
+    except:
+        from transformers import LlamaTokenizer
+        tokenizer = LlamaTokenizer.from_pretrained(args.base_model)
     tokenizer.padding_side = "left"
     
     model = AutoModelForCausalLM.from_pretrained(
