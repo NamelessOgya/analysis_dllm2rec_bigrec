@@ -58,12 +58,6 @@ fi
 # Patch evaluate.py to output debug_single_game.json instead of game.json
 # This is required because run_bigrec_inference*.sh expects <dataset>.json
 echo "Patching evaluate.py..."
-sed -i '' "s/game.json/debug_single_game.json/g" "$TARGET_DIR/evaluate.py"
-# Note: sed -i '' is for macOS. For Linux it might differ (sed -i), but user is on mac.
-# To be safe for both (if running in container which is likely Linux), we should be careful.
-# But this script is running locally on Mac? User said "The USER's OS version is mac."
-# If running in linux container, sed -i "" might fail or create a backup file named "".
-# Safe way for both usually: temp file
 sed "s/game.json/debug_single_game.json/g" "$SOURCE_DIR/evaluate.py" > "$TARGET_DIR/evaluate.py"
 
 
