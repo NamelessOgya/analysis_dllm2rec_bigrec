@@ -194,7 +194,7 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
         for i, batch_prompts in tqdm(enumerate(get_batches(prompts, eff_batch_size)), total=total_batches, desc="Inference Batches"):
             # vLLM beam_search expects dict with "prompt" key or tokens
             batch_beam_prompts = [{"prompt": p} for p in batch_prompts]
-            outputs = llm.beam_search(batch_beam_prompts, beam_params)
+            outputs = llm.beam_search(batch_beam_prompts, beam_params, lora_request=lora_request)
             
             # Map outputs back to global index
             global_start_idx = i * eff_batch_size
@@ -214,6 +214,11 @@ def process_file(llm, input_path, output_path, lora_request, num_beams, temperat
         )
 
         # Use batched generation to avoid OOM while maintaining high throughput
+        if lora_request:
+            print(f"DEBUG: Generating with LoRA adapter: {lora_request.lora_name}")
+        else:
+            print(f"DEBUG: Generating WITHOUT LoRA (lora_request is None)")
+
         for i, batch_prompts in tqdm(enumerate(get_batches(prompts, eff_batch_size)), total=total_batches, desc="Inference Batches"):
             outputs = llm.generate(batch_prompts, sampling_params, lora_request=lora_request)
             
