@@ -6,6 +6,7 @@ import math
 import json
 # os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import argparse
+from tqdm import tqdm
 parse = argparse.ArgumentParser()
 parse.add_argument("--input_dir",type=str, default="./", help="your model directory")
 parse.add_argument("--base_model", type=str, default="Qwen/Qwen2-0.5B", help="base model path")
