@@ -331,28 +331,22 @@ def save_metrics(args, test_hr, test_ndcg, valid_hr, valid_ndcg):
 
     os.makedirs(output_dir, exist_ok=True)
     
-    # Save test metrics using the format aligned with BIGRec/evaluate.py
-    # key: arbitrary identifier (e.g., "test_metrics")
-    test_dict = {
-        "test_metrics": {
+    # Save metrics to a single file aligned with BIGRec format
+    metrics_dict = {
+        "test": {
             "NDCG": test_ndcg,
             "HR": test_hr
-        }
-    }
-    with open(os.path.join(output_dir, "test_metrics.json"), 'w') as f:
-        json.dump(test_dict, f, indent=4)
-        
-    # Save valid metrics
-    valid_dict = {
-        "valid_metrics": {
+        },
+        "valid": {
             "NDCG": valid_ndcg,
             "HR": valid_hr
         }
     }
-    with open(os.path.join(output_dir, "valid_metrics.json"), 'w') as f:
-        json.dump(valid_dict, f, indent=4)
     
-    print(f"Saved metrics to {output_dir}")
+    with open(os.path.join(output_dir, "metrics.json"), 'w') as f:
+        json.dump(metrics_dict, f, indent=4)
+    
+    print(f"Saved metrics to {output_dir}/metrics.json")
 
 if __name__ == '__main__':
     args = parse_args()
