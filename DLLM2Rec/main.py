@@ -37,7 +37,16 @@ def parse_args():
     parser.add_argument('--gamma_position', type=float, default=0.3, help='weight for ranking position-aware')
     parser.add_argument('--gamma_confidence', type=float, default=0.5, help='weight for ranking importance-aware')
     parser.add_argument('--gamma_consistency', type=float, default=0.1, help='weight for ranking consistency-aware')
-    parser.add_argument('--beta2', type=float, default=1.0, help='weight for importance-aware ranking distillation')   
+    parser.add_argument('--beta2', type=float, default=1.0, help='weight for importance-aware ranking distillation')
+    # Custom paths for BIGRec data
+    parser.add_argument('--embedding_path', type=str, default=None, help='Path to LLM embeddings file (.pt)')
+    parser.add_argument('--ranking_path', type=str, default=None, help='Path to ranking file (.txt)')
+    parser.add_argument('--confidence_path', type=str, default=None, help='Path to confidence file (.txt)')
+    parser.add_argument('--ranking_path', type=str, default=None, help='Path to ranking file (.txt)')
+    parser.add_argument('--confidence_path', type=str, default=None, help='Path to confidence file (.txt)')
+    parser.add_argument('--teacher_model', type=str, default="", help='Name of the teacher model for directory naming')
+    parser.add_argument('--seed', type=int, default=2024, help='Random seed for student (and implies teacher seed)')
+    parser.add_argument('--teacher_sample', type=str, default="", help='Sample size of teacher model for directory naming')
     return parser.parse_args()
 
     
@@ -287,14 +296,44 @@ def set_seed(seed):
     torch.manual_seed(seed)
 
 def save_metrics(args, test_hr, test_ndcg, valid_hr, valid_ndcg):
-    # Create directory
-    # Format: results/[data_name]/sasrec/seed_-1/
-    output_dir = os.path.join("results", args.data, "sasrec", "seed_-1")
+    # Determine distillation status for directory naming
+    is_distilled = (args.ed_weight > 0 or args.lam > 0)
+    
+    is_distilled = (args.ed_weight > 0 or args.lam > 0)
+    
+    if is_distilled:
+        if args.teacher_model:
+            teacher_name = args.teacher_model.replace('/', '_')
+        else:
+            teacher_name = "unknown_teacher"
+        
+        # Parent directory: [DATASET]/[STUDENT_MODEL]_distilled_[TEACHER_MODEL]
+        parent_dir_name = f"{args.model_name.lower()}_distilled_{teacher_name}"
+        
+        # Hyperparameter directory: ed_[ED_WEIGHT]_lam_[LAM]
+        hyper_dir_name = f"ed_{args.ed_weight}_lam_{args.lam}"
+        
+        # Sub directory: [seed]_[TEACHER_SAMPLE]
+        if args.teacher_sample:
+            sub_dir_name = f"{args.seed}_{args.teacher_sample}"
+        else:
+             sub_dir_name = f"{args.seed}_unknown"
+             
+        # Order: Parent -> Seed/Sample -> Hyperparams
+        output_dir = os.path.join("results", args.data, parent_dir_name, sub_dir_name, hyper_dir_name)
+        
+    else:
+        # No distillation case
+        # [DATASET]/[STUDENT_MODEL]_no_distillation/[seed]/alpha_[ALPHA]
+        hyper_dir_name = f"alpha_{args.alpha}"
+        output_dir = os.path.join("results", args.data, f"{args.model_name.lower()}_no_distillation", str(args.seed), hyper_dir_name)
+
     os.makedirs(output_dir, exist_ok=True)
     
-    # Save test metrics
+    # Save test metrics using the format aligned with BIGRec/evaluate.py
+    # key: arbitrary identifier (e.g., "test_metrics")
     test_dict = {
-        args.model_name.lower(): {
+        "test_metrics": {
             "NDCG": test_ndcg,
             "HR": test_hr
         }
@@ -304,7 +343,7 @@ def save_metrics(args, test_hr, test_ndcg, valid_hr, valid_ndcg):
         
     # Save valid metrics
     valid_dict = {
-        args.model_name.lower(): {
+        "valid_metrics": {
             "NDCG": valid_ndcg,
             "HR": valid_hr
         }
@@ -315,10 +354,10 @@ def save_metrics(args, test_hr, test_ndcg, valid_hr, valid_ndcg):
     print(f"Saved metrics to {output_dir}")
 
 if __name__ == '__main__':
-    s = time.time()
-    set_seed(2024)
-
     args = parse_args()
+    s = time.time()
+    set_seed(args.seed)
+
     print('-' * 40 + 'ARGUMENTS' + '-' * 40)
     for arg in vars(args):
         print('{:40} {}'.format(arg, getattr(args, arg)))
@@ -336,7 +375,11 @@ if __name__ == '__main__':
 
     tocf_data_directory = './tocf/' + args.data
     if args.ed_weight != 0:
-        llm_all_emb_path = os.path.join(tocf_data_directory, 'all_embeddings.pt')
+        if args.embedding_path:
+            llm_all_emb_path = args.embedding_path
+        else:
+            llm_all_emb_path = os.path.join(tocf_data_directory, 'all_embeddings.pt')
+        print(f"Loading embeddings from: {llm_all_emb_path}")
         llm_all_emb = torch.load(llm_all_emb_path) # [num_item, 4096]
         llm_all_emb = llm_all_emb.to(device)
         llm_input_dim = llm_all_emb.shape[1]
@@ -369,10 +412,19 @@ if __name__ == '__main__':
         ps = ps.to(device)
 
     if args.lam != 0:       
-        candidate_path = os.path.join(tocf_data_directory, 'myrank_train.txt')
+        if args.ranking_path:
+            candidate_path = args.ranking_path
+        else:
+            candidate_path = os.path.join(tocf_data_directory, 'myrank_train.txt')
+        print(f"Loading ranking from: {candidate_path}")
         all_candidate = np.loadtxt(candidate_path)
         all_candidate = torch.LongTensor(all_candidate).to(device) # [train_data_num, k]
-        llm_confidence_path = os.path.join(tocf_data_directory, 'confidence_train.txt')
+        
+        if args.confidence_path:
+            llm_confidence_path = args.confidence_path
+        else:
+            llm_confidence_path = os.path.join(tocf_data_directory, 'confidence_train.txt')
+        print(f"Loading confidence from: {llm_confidence_path}")
         llm_confidence = np.loadtxt(llm_confidence_path)
         llm_confidence = torch.tensor(llm_confidence, dtype=torch.float).to(device) # [train_data_num, k]
     else:
