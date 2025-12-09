@@ -239,16 +239,19 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
     prediction = model.forward(states, np.array(len_states),llm_emb) # [num_test,num_item]
     sorted_list = torch.argsort(prediction.detach()).cpu().numpy()
 
-    hit_purchase = [0, 0, 0, 0]
-    ndcg_purchase = [0, 0, 0, 0]
+    hit_purchase = [0] * len(topk)
+    ndcg_purchase = [0] * len(topk)
     calculate_hit(sorted_list=sorted_list, topk=topk, true_items=actions, hit_purchase=hit_purchase,
                   ndcg_purchase=ndcg_purchase)
 
     print('#' * 120)
     hr_list = []
     ndcg_list = []
-    print('hr@{}\tndcg@{}\thr@{}\tndcg@{}\thr@{}\tndcg@{}\thr@{}\tndcg@{}'.format(topk[0], topk[0], topk[1], topk[1],
-                                                                                  topk[2], topk[2], topk[3], topk[3]))
+    
+    # Dynamic header
+    header = '\t'.join([f'hr@{k}\tndcg@{k}' for k in topk])
+    print(header)
+
     for i in range(len(topk)):
         hr_purchase = hit_purchase[i] / total_purchase
         ng_purchase = ndcg_purchase[i] / total_purchase
@@ -257,16 +260,16 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
             ndcg_list.append(ng_purchase)
         else:
             ndcg_list.append(ng_purchase[0, 0])
-        if i == 3:
+        
+        # Track @20 specifically
+        if topk[i] == 20:
             hr_20 = hr_purchase
             ndcg_20 = ng_purchase
             rec_list = sorted_list[:, -topk[i]:]
 
-    print(
-        '{:.6f}\t{:.6f}\t{:.6f}\t{:.6f}\t{:.6f}\t{:.6f}\t{:.6f}\t{:.6f}'.format(hr_list[0], (ndcg_list[0]), hr_list[1],
-                                                                                (ndcg_list[1]), hr_list[2],
-                                                                                (ndcg_list[2]), hr_list[3],
-                                                                                (ndcg_list[3])))
+    # Dynamic values print
+    values_str = '\t'.join(['{:.6f}\t{:.6f}'.format(h, n) for h, n in zip(hr_list, ndcg_list)])
+    print(values_str)
     print('#' * 120)
     return prediction, hr_list, ndcg_list
 
@@ -368,7 +371,7 @@ if __name__ == '__main__':
     seq_size = data_statis['seq_size'][0]  # the length of history to define the seq
     item_num = data_statis['item_num'][0]  # total number of items
 
-    topk = [1, 5, 10, 20]
+    topk = [1, 3, 5, 10, 20, 50]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     tocf_data_directory = './tocf/' + args.data
@@ -593,10 +596,11 @@ if __name__ == '__main__':
                 s_test = time.time()
                 prediction, hr_list, ndcg_list = myevaluate(model, test_path, device, llm_all_emb)
                 e_test = time.time()
-                if ndcg_list[-1] > best_ndcg20:
+                # Assuming topk=[1, 3, 5, 10, 20, 50], index 4 is @20
+                if ndcg_list[4] > best_ndcg20:
                     patient = 0 
-                    best_ndcg20 = ndcg_list[-1]
-                    best_hr20 = hr_list[-1]
+                    best_ndcg20 = ndcg_list[4]
+                    best_hr20 = hr_list[4]
                     best_hr_list_result = hr_list
                     best_ndcg_list_result = ndcg_list
                     best_val_hr_list_result = val_hr_list
