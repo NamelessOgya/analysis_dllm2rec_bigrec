@@ -28,9 +28,9 @@ BEST_METRICS_FILE=""
 SAFE_TEACHER_NAME=$(echo "$BIGREC_BASE_MODEL" | tr '/' '_')
 BASE_RESULT_DIR="DLLM2Rec/results/${DATASET}/${MODEL_NAME,,}_distilled_${SAFE_TEACHER_NAME}/${BIGREC_SEED}_${BIGREC_SAMPLE}"
 
-# Iterate ed_weight from 0.0 to 1.0 step 0.1
-for ed in $(seq 0.0 0.1 1.0); do
-    for lam in $(seq 0.0 0.1 1.0); do
+# Iterate ed_weight from 0.0 to 1.0 step 0.2
+for ed in $(seq 0.0 0.2 1.0); do
+    for lam in $(seq 0.0 0.2 1.0); do
         echo "========================================================"
         echo "Testing Params: ed_weight=$ed, lam=$lam"
         echo "========================================================"

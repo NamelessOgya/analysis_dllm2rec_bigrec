@@ -33,7 +33,7 @@
     ```bash
     ./cmd/run_dllm2rec_hyparam_search.sh <DATASET> <MODEL_NAME> <GPU_ID> <BIGREC_BASE_MODEL> <BIGREC_SEED> <BIGREC_SAMPLE>
     ```
-*   **動作**: `ed_weight` (0.0-1.0) と `lam` (0.0-1.0) を0.1刻みで探索し、HR@20が最大のパラメータを特定します。
+*   **動作**: `ed_weight` (0.0-1.0) と `lam` (0.0-1.0) を0.2刻みで探索し、HR@20が最大のパラメータを特定します。
 *   **出力**: `results/.../[SEED]_[TEACHER_SAMPLE]/best_params.json` に最適値とスコアを保存します。
 
 ## 3. 出力仕様

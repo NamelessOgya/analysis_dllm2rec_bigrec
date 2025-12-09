@@ -195,8 +195,8 @@ BIGRecの知識を蒸留してSASRecなどの学生モデルを学習させま�
 # 引数: <dataset> <model_name> <gpu_id> <bigrec_base_model> <bigrec_seed> <bigrec_sample>
 ./cmd/run_dllm2rec_hyparam_search.sh game SASRec 0 "Qwen/Qwen2-0.5B" 0 1024
 ```
-*   `ed_weight`: 0.0 ~ 1.0 (0.1刻み)
-*   `lam`: 0.0 ~ 1.0 (0.1刻み)
+*   `ed_weight`: 0.0 ~ 1.0 (0.2刻み)
+*   `lam`: 0.0 ~ 1.0 (0.2刻み)
 *   結果は各パラメータのディレクトリに保存され、最もHR@20が高かった設定が `best_params.json` として `results/.../[SEED]_[TEACHER_SAMPLE]/` 直下に保存されます。
 
 ### 9. SASRecベースラインの実行
