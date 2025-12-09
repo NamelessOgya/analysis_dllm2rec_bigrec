@@ -42,8 +42,6 @@ def parse_args():
     parser.add_argument('--embedding_path', type=str, default=None, help='Path to LLM embeddings file (.pt)')
     parser.add_argument('--ranking_path', type=str, default=None, help='Path to ranking file (.txt)')
     parser.add_argument('--confidence_path', type=str, default=None, help='Path to confidence file (.txt)')
-    parser.add_argument('--ranking_path', type=str, default=None, help='Path to ranking file (.txt)')
-    parser.add_argument('--confidence_path', type=str, default=None, help='Path to confidence file (.txt)')
     parser.add_argument('--teacher_model', type=str, default="", help='Name of the teacher model for directory naming')
     parser.add_argument('--seed', type=int, default=2024, help='Random seed for student (and implies teacher seed)')
     parser.add_argument('--teacher_sample', type=str, default="", help='Sample size of teacher model for directory naming')
