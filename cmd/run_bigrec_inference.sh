@@ -17,6 +17,7 @@ DEBUG_LIMIT=${9:--1}
 USE_EMBEDDING_MODEL=${10:-false}
 USE_POPULARITY=${11:-false}
 POPULARITY_GAMMA=${12:-0.0}
+CHECKPOINT_EPOCH=${13:-"best"}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
@@ -26,7 +27,7 @@ SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
 # Define paths
 BIGREC_DIR="BIGRec"
 # Output directory structure aligned with training: ./model/<dataset>/<safe_model_name>/<seed>_<sample>
-RESULT_DIR="BIGRec/results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+# RESULT_DIR will be defined later, after EPOCH_SUFFIX is determined.
 # Define paths
 # Use root-relative paths
 DATA_DIR="BIGRec/data/$DATASET"
@@ -43,24 +44,77 @@ else
 fi
 
 # Construct LoRA weights path
-# Construct LoRA weights path
 BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 LORA_WEIGHTS="$BASE_LORA_PATH"
+EPOCH_SUFFIX="_epoch_best" # Default suffix
 
-# Check for best model checkpoint
+# Check for specific checkpoint
 if [ -d "$BASE_LORA_PATH" ]; then
-    # Find directory named best_model_epoch_*
-    # We use sort to pick the one with highest epoch if multiple exist (though training usually saves one 'best')
-    BEST_MODEL=$(find "$BASE_LORA_PATH" -maxdepth 1 -type d -name "best_model_epoch_*" | sort -V | tail -n 1)
-    
-    if [ -n "$BEST_MODEL" ]; then
-        echo "Found Best Model checkpoint: $BEST_MODEL"
-        LORA_WEIGHTS="$BEST_MODEL"
+    if [ "$CHECKPOINT_EPOCH" == "best" ]; then
+        # Find directory named best_model_epoch_*
+        # We use sort to pick the one with highest epoch if multiple exist (though training usually saves one 'best')
+        BEST_MODEL=$(find "$BASE_LORA_PATH" -maxdepth 1 -type d -name "best_model_epoch_*" | sort -V | tail -n 1)
+        
+        if [ -n "$BEST_MODEL" ]; then
+            echo "Found Best Model checkpoint: $BEST_MODEL"
+            LORA_WEIGHTS="$BEST_MODEL"
+            EPOCH_SUFFIX="_epoch_best"
+        else
+            echo "Error: No best model checkpoint (best_model_epoch_*) found in $BASE_LORA_PATH"
+            exit 1
+        fi
     else
-        echo "Error: No best model checkpoint (best_model_epoch_*) found in $BASE_LORA_PATH"
-        exit 1
+        # User specified a specific epoch
+        TARGET_EPOCH="$CHECKPOINT_EPOCH"
+        EPOCH_SUFFIX="_epoch${TARGET_EPOCH}"
+        
+        # 1. Check if best_model_epoch_X exists
+        SPECIFIC_BEST="${BASE_LORA_PATH}/best_model_epoch_${TARGET_EPOCH}"
+        if [ -d "$SPECIFIC_BEST" ]; then
+             echo "Found specified epoch in best model: $SPECIFIC_BEST"
+             LORA_WEIGHTS="$SPECIFIC_BEST"
+        else
+             # 2. Search in checkpoint-* directories via trainer_state.json
+             FOUND_CHECKPOINT=""
+             echo "Searching for epoch $TARGET_EPOCH in checkpoints..."
+             
+             for d in "$BASE_LORA_PATH"/checkpoint-*; do
+                 if [ -d "$d" ]; then
+                     STATE_FILE="$d/trainer_state.json"
+                     if [ -f "$STATE_FILE" ]; then
+                         # python one-liner to extract epoch (as float)
+                         # We compare int(epoch) or float matches
+                         CHECK_EPOCH=$(python -c "import json; 
+try:
+    with open('$STATE_FILE') as f: data = json.load(f); 
+    print(data.get('epoch', -1))
+except: print(-1)")
+                         
+                         # Compare formatted strings to avoid float precision issues, or simple integer comparison
+                         # Using python to compare might be safer
+                         IS_MATCH=$(python -c "print(1 if abs(float('$CHECK_EPOCH') - float('$TARGET_EPOCH')) < 0.001 else 0)")
+                         
+                         if [ "$IS_MATCH" -eq 1 ]; then
+                             FOUND_CHECKPOINT="$d"
+                             break
+                         fi
+                     fi
+                 fi
+             done
+             
+             if [ -n "$FOUND_CHECKPOINT" ]; then
+                  echo "Found checkpoint for epoch $TARGET_EPOCH: $FOUND_CHECKPOINT"
+                  LORA_WEIGHTS="$FOUND_CHECKPOINT"
+             else
+                  echo "Error: Could not find checkpoint for epoch $TARGET_EPOCH in $BASE_LORA_PATH"
+                  exit 1
+             fi
+        fi
     fi
 fi
+
+# Define RESULT_DIR after EPOCH_SUFFIX is determined
+RESULT_DIR="BIGRec/results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}${EPOCH_SUFFIX}"
 
 # Ensure result directory exists
 mkdir -p "$RESULT_DIR"

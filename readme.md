@@ -122,7 +122,22 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 ```
 
 ### 5. BIGRecの推論
-... (existing content) ...
+
+学習したモデルを使って推論（データの生成）を行います。生成されたデータは `BIGRec/results/...` に保存されます。
+
+```bash
+# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size> <debug_limit> <use_embedding_model> <use_popularity> <popularity_gamma> <checkpoint_epoch>
+# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "valid_test" 16 -1 false false 0.0 "best"
+
+# 例: 基本的な実行（デフォルト設定、Best Model使用）
+./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B"
+
+# 例: 特定のEpoch (例: 10) のチェックポイントを使用して推論
+# (第13引数にEpoch数を指定)
+./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "valid_test" 16 -1 false false 0.0 10
+
+# 例: train.json を対象に実行する場合 (target_split="train.json")
+# ./cmd/run_bigrec_inference.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "train.json"
 ```
 ※ 推論完了後、自動的に評価スクリプト (`evaluate.py`) が実行され、結果は `BIGRec/results/...` に保存されます。
 
@@ -131,11 +146,15 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 vLLMを使用して推論を高速に実行します。
 
 ```bash
-# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size> <limit> <prompt_file> <use_embedding_model>
-# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" false
+# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size> <limit> <prompt_file> <use_embedding_model> <use_popularity> <popularity_gamma> <checkpoint_epoch>
+# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" false false 0.0 "best"
 
-# 例: 基本的な実行（デフォルト設定）
+# 例: 基本的な実行（デフォルト設定、Best Model使用）
 ./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B"
+
+# 例: 特定のEpoch (例: epoch 10) のチェックポイントを使用して推論
+# (第14引数にEpoch数を指定。出力ファイルには `_epoch10` が付与されます)
+./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" false false 0.0 10
 
 # 例: train.json の最初の100件のみを実行（テスト用）
 # 第9引数で limit を指定します
@@ -146,7 +165,7 @@ vLLMを使用して推論を高速に実行します。
 
 # 例: カスタムプロンプトを使用して推論する場合
 # (第10引数にプロンプトファイルのパスを指定)
-./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "my_templates/inference_prompt.txt"
+# ./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "my_templates/inference_prompt.txt"
 
 # 例: E5モデル (multilingual-e5-large) をアイテム埋め込みと予測評価に使用する場合
 # (第11引数をtrueに指定。プロンプトファイルがない場合は空文字 "" を指定)

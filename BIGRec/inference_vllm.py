@@ -56,6 +56,7 @@ def main(
     dataset: str = None,
     limit: int = -1,
     prompt_file: str = None,
+    output_suffix: str = "",
 ):
     assert base_model, "Please specify a --base_model"
 
@@ -84,19 +85,41 @@ def main(
     # Determine files to process
     files_to_process = []
     
+    # Construct filenames with suffix if provided
+    # e.g. valid_epoch10.json
+    def get_filename(base_name, suffix):
+        if not suffix:
+            return base_name
+        name, ext = os.path.splitext(base_name)
+        return f"{name}{suffix}{ext}"
+
     if test_data_path == "valid_test":
         if not dataset:
             raise ValueError("Argument --dataset is required when using 'valid_test'")
-        files_to_process.append(("valid.json", "valid.json"))
-        files_to_process.append(("test.json", "test.json"))
+        files_to_process.append(("valid.json", get_filename("valid.json", output_suffix)))
+        files_to_process.append(("test.json", get_filename("test.json", output_suffix)))
     elif test_data_path == "all":
         if not dataset:
             raise ValueError("Argument --dataset is required when using 'all'")
-        files_to_process.append(("train.json", "train.json"))
-        files_to_process.append(("valid.json", "valid.json"))
-        files_to_process.append(("test.json", "test.json"))
+        files_to_process.append(("train.json", get_filename("train.json", output_suffix)))
+        files_to_process.append(("valid.json", get_filename("valid.json", output_suffix)))
+        files_to_process.append(("test.json", get_filename("test.json", output_suffix)))
     else:
         # Single file mode
+        # If output_suffix is provided, we should probably append it to result_json_data too?
+        # But usually result_json_data is explicit path.
+        # If user passes explicit path AND suffix, what happens?
+        # The prompt implies: "output items ... suffix appended".
+        # For single file mode, run_bigrec_inference.sh handles the full path construction.
+        # But inference_vllm.sh might pass explicit path.
+        # Let's assume for single file, the caller handles the naming if they want specific name.
+        # BUT if result_json_data serves as a base name...
+        # Current usage in run_bigrec_inference_vllm.sh is "res.json" or similar.
+        # Actually inference_vllm.sh passes explicit filenames.
+        # So suffix logic mainly applies to the batch modes ("valid_test", "all").
+        # For single file, we respect result_json_data as is, OR we apply suffix if user requested?
+        # Let's apply suffix if it's not present? No, that's risky.
+        # Let's stick to applying suffix only for generated filenames in batch modes.
         files_to_process.append((test_data_path, result_json_data))
 
     # Base directory for data if using keywords

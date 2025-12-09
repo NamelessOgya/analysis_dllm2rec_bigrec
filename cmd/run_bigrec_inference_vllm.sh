@@ -18,6 +18,7 @@ PROMPT_FILE=${10:-""}
 USE_EMBEDDING_MODEL=${11:-false}
 USE_POPULARITY=${12:-false}
 POPULARITY_GAMMA=${13:-0.0}
+CHECKPOINT_EPOCH=${14:-"best"}
 
 echo "Running BIGRec inference (vLLM) for dataset: $DATASET"
 
@@ -28,8 +29,75 @@ SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
 BIGREC_DIR="BIGRec"
 RESULT_DIR="BIGRec/results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 DATA_DIR="BIGRec/data/$DATASET"
+# Result path calculation deferred until suffix is known
+
+# Construct LoRA weights path
+BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+LORA_WEIGHTS="$BASE_LORA_PATH"
+EPOCH_SUFFIX="_epoch_best" # Default suffix
+
+# Check for specific checkpoint
+if [ -d "$BASE_LORA_PATH" ]; then
+    if [ "$CHECKPOINT_EPOCH" == "best" ]; then
+        # Find directory named best_model_epoch_*
+        # We use sort to pick the one with highest epoch if multiple exist (though training usually saves one 'best')
+        BEST_MODEL=$(find "$BASE_LORA_PATH" -maxdepth 1 -type d -name "best_model_epoch_*" | sort -V | tail -n 1)
+        
+        if [ -n "$BEST_MODEL" ]; then
+            echo "Found Best Model checkpoint: $BEST_MODEL"
+            LORA_WEIGHTS="$BEST_MODEL"
+            EPOCH_SUFFIX="_epoch_best"
+        else
+            echo "Error: No best model checkpoint (best_model_epoch_*) found in $BASE_LORA_PATH"
+            exit 1
+        fi
+    else
+        # User specified a specific epoch
+        TARGET_EPOCH="$CHECKPOINT_EPOCH"
+        EPOCH_SUFFIX="_epoch${TARGET_EPOCH}"
+        
+        # 1. Check if best_model_epoch_X exists
+        SPECIFIC_BEST="${BASE_LORA_PATH}/best_model_epoch_${TARGET_EPOCH}"
+        if [ -d "$SPECIFIC_BEST" ]; then
+             echo "Found specified epoch in best model: $SPECIFIC_BEST"
+             LORA_WEIGHTS="$SPECIFIC_BEST"
+        else
+             # 2. Search in checkpoint-* directories via trainer_state.json
+             FOUND_CHECKPOINT=""
+             echo "Searching for epoch $TARGET_EPOCH in checkpoints..."
+             
+             for d in "$BASE_LORA_PATH"/checkpoint-*; do
+                 if [ -d "$d" ]; then
+                     STATE_FILE="$d/trainer_state.json"
+                     if [ -f "$STATE_FILE" ]; then
+                         # python one-liner to extract epoch (as float)
+                         CHECK_EPOCH=$(python -c "import json; 
+try:
+    with open('$STATE_FILE') as f: data = json.load(f); 
+    print(data.get('epoch', -1))
+except: print(-1)")
+                         IS_MATCH=$(python -c "print(1 if abs(float('$CHECK_EPOCH') - float('$TARGET_EPOCH')) < 0.001 else 0)")
+                         if [ "$IS_MATCH" -eq 1 ]; then
+                             FOUND_CHECKPOINT="$d"
+                             break
+                         fi
+                     fi
+                 fi
+             done
+             
+             if [ -n "$FOUND_CHECKPOINT" ]; then
+                  echo "Found checkpoint for epoch $TARGET_EPOCH: $FOUND_CHECKPOINT"
+                  LORA_WEIGHTS="$FOUND_CHECKPOINT"
+             else
+                  echo "Error: Could not find checkpoint for epoch $TARGET_EPOCH in $BASE_LORA_PATH"
+                  exit 1
+             fi
+        fi
+    fi
+fi
+
+# Define paths now that suffix is known
 TEST_DATA_PATH="$DATA_DIR/$TEST_DATA"
-RESULT_JSON_PATH="$RESULT_DIR/$TEST_DATA"
 
 # Special handling for "all" or "valid_test"
 if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
@@ -46,26 +114,13 @@ else
         exit 1
     fi
     EXTRA_ARGS=""
-fi
-
-# Construct LoRA weights path
-
-BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
-LORA_WEIGHTS="$BASE_LORA_PATH"
-
-# Check for best model checkpoint
-if [ -d "$BASE_LORA_PATH" ]; then
-    # Find directory named best_model_epoch_*
-    # We use sort to pick the one with highest epoch if multiple exist (though training usually saves one 'best')
-    BEST_MODEL=$(find "$BASE_LORA_PATH" -maxdepth 1 -type d -name "best_model_epoch_*" | sort -V | tail -n 1)
     
-    if [ -n "$BEST_MODEL" ]; then
-        echo "Found Best Model checkpoint: $BEST_MODEL"
-        LORA_WEIGHTS="$BEST_MODEL"
-    else
-        echo "Error: No best model checkpoint (best_model_epoch_*) found in $BASE_LORA_PATH"
-        exit 1
-    fi
+    # Single file mode: Append suffix to filename
+    # Extract extension and base
+    FILENAME=$(basename "$TEST_DATA")
+    EXTENSION="${FILENAME##*.}"
+    BASENAME="${FILENAME%.*}"
+    RESULT_JSON_PATH="$RESULT_DIR/${BASENAME}${EPOCH_SUFFIX}.${EXTENSION}"
 fi
 
 # Ensure result directory exists
@@ -134,6 +189,7 @@ else
         --batch_size "$BATCH_SIZE" \
         --tensor_parallel_size "$NUM_GPUS" \
         --limit "$LIMIT" \
+        --output_suffix "$EPOCH_SUFFIX" \
         $( [ -n "$PROMPT_FILE" ] && echo "--prompt_file $PROMPT_FILE" ) \
         $EXTRA_ARGS
 fi
