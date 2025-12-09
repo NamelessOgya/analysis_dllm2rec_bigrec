@@ -186,7 +186,20 @@ BIGRecの知識を蒸留してSASRecなどの学生モデルを学習させま�
 ```
 ※ DLLM2Recのデフォルトデータセットは `game` になっていますが、前処理したデータセットに合わせて変更してください。
 
-### 8. SASRecベースラインの実行
+
+### 8. DLLM2Recのハイパーパラメータ探索
+
+`ed_weight` (Embedding Distillation) と `lam` (Ranking Distillation) のグリッドサーチを行い、最適な組み合わせを特定します。
+
+```bash
+# 引数: <dataset> <model_name> <gpu_id> <bigrec_base_model> <bigrec_seed> <bigrec_sample>
+./cmd/run_dllm2rec_hyparam_search.sh game SASRec 0 "Qwen/Qwen2-0.5B" 0 1024
+```
+*   `ed_weight`: 0.0 ~ 1.0 (0.1刻み)
+*   `lam`: 0.0 ~ 1.0 (0.1刻み)
+*   結果は各パラメータのディレクトリに保存され、最もHR@20が高かった設定が `best_params.json` として `results/.../[SEED]_[TEACHER_SAMPLE]/` 直下に保存されます。
+
+### 9. SASRecベースラインの実行
 
 蒸留を行わず、純粋なSASRecモデルを学習させてベースライン性能を測定します。
 
@@ -198,7 +211,8 @@ BIGRecの知識を蒸留してSASRecなどの学生モデルを学習させま�
 ./cmd/run_sasrec_baseline.sh game 0 200
 ```
 
-### 9. パイプライン実行（YAML設定ベース）
+### 10. パイプライン実行（YAML設定ベース）
+
 
 設定ファイル（YAML）に基づいて、BIGRec学習からDLLM2Rec学習までを一括実行します。
 ※ 前処理は事前に済ませておく必要があります。
