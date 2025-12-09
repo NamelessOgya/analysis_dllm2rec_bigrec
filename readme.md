@@ -202,13 +202,14 @@ BIGRecの知識を蒸留してSASRecなどの学生モデルを学習させま�
 ### 9. SASRecベースラインの実行
 
 蒸留を行わず、純粋なSASRecモデルを学習させてベースライン性能を測定します。
+出力されるmetrics.jsonのフォーマットはBIGRecと統一されており、`@1, @3, @5, @10, @20, @50` の6つのk値に対するスコアが記録されます（Early Stoppingは `@20` を基準に行われます）。
 
 ```bash
-# 引数: <dataset> <gpu_id> <epoch>
-# デフォルト: game 0 200
+# 引数: <dataset> <gpu_id> <epoch> <seed>
+# デフォルト: game 0 200 2024
 
-# 例: Gameデータセットでベースラインを実行
-./cmd/run_sasrec_baseline.sh game 0 200
+# 例: Gameデータセットでベースラインを実行 (Seed: 42)
+./cmd/run_sasrec_baseline.sh game 0 200 42
 ```
 
 ### 10. パイプライン実行（YAML設定ベース）

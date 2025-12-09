@@ -36,6 +36,15 @@
 *   **動作**: `ed_weight` (0.0-1.0) と `lam` (0.0-1.0) を0.2刻みで探索し、HR@20が最大のパラメータを特定します。
 *   **出力**: `results/.../[SEED]_[TEACHER_SAMPLE]/best_params.json` に最適値とスコアを保存します。
 
+### 2.4 SASRec Baseline実行スクリプト
+*   **スクリプト**: `cmd/run_sasrec_baseline.sh`
+*   **実行引数**:
+    ```bash
+    ./cmd/run_sasrec_baseline.sh <DATASET> <GPU_ID> <EPOCH> <SEED>
+    ```
+*   **説明**: 蒸留なしの純粋なSASRec（Baseline）を学習・評価します。
+*   **出力仕様**: 上記 `DLLM2Rec` と同一のMetricsフォーマット（6つのk値）でmetrics.jsonが出力されます。出力先は `results/[DATASET]/sasrec_no_distillation/[SEED]/alpha_0.0/...` となります。
+
 ## 3. 出力仕様
 
 ### 3.1 ディレクトリ構造
