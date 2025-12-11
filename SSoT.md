@@ -149,5 +149,6 @@ DLLM2Recの学習・評価結果は以下の命名規則に従って保存され
         *   `train.json` (5000件)
         *   `valid.json` (5000件)
         *   `test.json` (5000件)
+        *   `train_5000.json`, `valid_5000.json`, `test_5000.json` (上記ファイルのコピー)
         *   その他必要なメタデータファイル (`id2name.txt` 等)
     *   ファイル名はフルセット（`game_bigrec` 等）と同一ですが、格納ディレクトリが `_small` となります。

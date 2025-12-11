@@ -48,9 +48,18 @@ echo "Creating small dataset directory: $SMALL_DATA_DIR"
 mkdir -p "$SMALL_DATA_DIR"
 
 # Copy and rename files
-cp "$DATA_DIR/train_5000.json" "$SMALL_DATA_DIR/train.json"
-cp "$DATA_DIR/valid_5000.json" "$SMALL_DATA_DIR/valid.json"
-cp "$DATA_DIR/test_5000.json" "$SMALL_DATA_DIR/test.json"
+for FILE in "${FILES[@]}"; do
+    SOURCE="$DATA_DIR/$FILE"
+    
+    # Copy with original name (e.g., train_5000.json)
+    cp "$SOURCE" "$SMALL_DATA_DIR/"
+    
+    # Create standard alias (e.g., train.json)
+    # Extract base name (train, valid, test) by removing _5000.json
+    BASE_NAME=${FILE%_5000.json}
+    DEST="$SMALL_DATA_DIR/${BASE_NAME}.json"
+    cp "$SOURCE" "$DEST"
+done
 
 # Copy auxiliary files if they exist
 AUX_FILES=("id2name.txt" "movies.dat" "ratings.dat")
