@@ -15,9 +15,13 @@ NOTEBOOK_PATH="$DATA_DIR/process.ipynb"
 SCRIPT_PATH="$DATA_DIR/process.py"
 
 # Check if python script exists
-SCRIPT_PATH="$DATA_DIR/process.py"
-if [ ! -f "$SCRIPT_PATH" ]; then
-    echo "Error: Python script not found at $SCRIPT_PATH"
+# Check if python script exists
+if [ -f "$DATA_DIR/process.py" ]; then
+    SCRIPT_PATH="$DATA_DIR/process.py"
+elif [ -f "$DATA_DIR/convert_dllm2rec_to_bigrec.py" ]; then
+    SCRIPT_PATH="$DATA_DIR/convert_dllm2rec_to_bigrec.py"
+else
+    echo "Error: No suitable python script found in $DATA_DIR"
     exit 1
 fi
 
@@ -30,6 +34,7 @@ fi
 echo "Running data processing script..."
 cd "$DATA_DIR"
 # python process.py
-python convert_dllm2rec_to_bigrec.py
+# python convert_dllm2rec_to_bigrec.py
+python3 "$(basename "$SCRIPT_PATH")"
 
 echo "Data preprocessing completed for $DATASET"

@@ -3,32 +3,67 @@
 # Exit on error
 set -e
 
-SOURCE_DIR="BIGRec/data/movie"
-TARGET_DIR="BIGRec/data/movie_small"
-NUM_LINES=100000
+# Dataset argument
+DATASET=${1:-game}
 
-echo "Creating small dataset in $TARGET_DIR..."
+echo "============================================"
+echo "Creating small dataset for: $DATASET"
+echo "============================================"
 
-# Ensure source exists
-if [ ! -f "$SOURCE_DIR/ratings.dat" ]; then
-    echo "Error: Source ratings.dat not found in $SOURCE_DIR"
+BIGREC_DIR="BIGRec"
+DATA_DIR="$BIGREC_DIR/data/$DATASET"
+PREPROCESS_SCRIPT="./cmd/run_preprocess_data.sh"
+
+# Check if preprocess script exists
+if [ ! -f "$PREPROCESS_SCRIPT" ]; then
+    echo "Error: Preprocessing script not found at $PREPROCESS_SCRIPT"
     exit 1
 fi
 
-# Create target directory
-mkdir -p "$TARGET_DIR"
+# Run preprocessing
+# This script has been modified to automatically generate *_5000.json files
+echo "Running preprocessing script..."
+bash "$PREPROCESS_SCRIPT" "$DATASET"
 
-# Copy movies.dat (it's small enough)
-cp "$SOURCE_DIR/movies.dat" "$TARGET_DIR/"
+# Verify outputs and create small dataset directory
+echo "Verifying and restructuring small dataset..."
+FILES=("train_5000.json" "valid_5000.json" "test_5000.json")
+MISSING=0
 
-# Create small ratings.dat
-echo "Sampling top $NUM_LINES interactions..."
-head -n $NUM_LINES "$SOURCE_DIR/ratings.dat" > "$TARGET_DIR/ratings.dat"
+for FILE in "${FILES[@]}"; do
+    if [ ! -f "$DATA_DIR/$FILE" ]; then
+        echo "Error: $FILE not found in $DATA_DIR"
+        MISSING=1
+    fi
+done
 
-# Copy process.py if it exists, or we rely on the run script to use the one in source?
-# The run script currently cd's to DATA_DIR. So we need process.py in TARGET_DIR.
-if [ -f "$SOURCE_DIR/process.py" ]; then
-    cp "$SOURCE_DIR/process.py" "$TARGET_DIR/"
+if [ $MISSING -eq 1 ]; then
+    echo "Failed to create all small dataset files."
+    exit 1
 fi
 
-echo "Small dataset created successfully."
+# Create small dataset directory
+SMALL_DATA_DIR="${DATA_DIR}_small"
+echo "Creating small dataset directory: $SMALL_DATA_DIR"
+mkdir -p "$SMALL_DATA_DIR"
+
+# Copy and rename files
+cp "$DATA_DIR/train_5000.json" "$SMALL_DATA_DIR/train.json"
+cp "$DATA_DIR/valid_5000.json" "$SMALL_DATA_DIR/valid.json"
+cp "$DATA_DIR/test_5000.json" "$SMALL_DATA_DIR/test.json"
+
+# Copy auxiliary files if they exist
+AUX_FILES=("id2name.txt" "movies.dat" "ratings.dat")
+for AUX in "${AUX_FILES[@]}"; do
+    if [ -f "$DATA_DIR/$AUX" ]; then
+        echo "Copying $AUX..."
+        cp "$DATA_DIR/$AUX" "$SMALL_DATA_DIR/"
+    fi
+done
+
+echo "============================================"
+echo "Small dataset creation completed successfully."
+echo "Location: $SMALL_DATA_DIR"
+echo "Files created:"
+ls -1 "$SMALL_DATA_DIR"
+echo "============================================"

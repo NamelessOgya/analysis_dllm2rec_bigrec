@@ -51,46 +51,104 @@ for user_id in interaction_dicts:
 print(len(sequential_interaction_list))
 
 import csv
+# Add IDs to the list
+# We want continuous IDs across train -> valid -> test
+# The list is sorted by timestamp (or at least partially sorted)
+# The split happens by index.
+# So if we assign IDs to the sorted list, they will be sequential in the splits.
+# BUT verify the split logic: list[:0.8], list[0.8:0.9], list[0.9:]
+# So yes, user ID 1 will be in train, ID 2 in train... ID N in test.
+# Wait, list items are interactions? No, `sequential_interaction_list` has one entry per user?
+# Line 36: `sequential_interaction_list` seems to store sequences.
+# Line 47: loop `for i in range(10, len(...))`. This generates multiple sequences per user.
+# So yes, each item is a sequence sample.
+
+# Assign 'id' to each item in sequential_interaction_list
+# We want continuous IDs across train -> valid -> test
+# The list is sorted by timestamp (or at least partially sorted)
+
+# Sort BEFORE adding ID to ensure deterministic order
 sequential_interaction_list = sorted(sequential_interaction_list, key=lambda x: int(x[-1]))
+
+# Now assign IDs based on sorted order
+for idx, item in enumerate(sequential_interaction_list):
+    item.append(idx + 1) # ID is now the last element
+
+# Headers need to be updated.
+headers = ['user_id', 'history_movie_title', 'history_movie_id', 'history_rating', 'movie_id', 'rating', 'timestamp', 'id']
+
 with open('./train.csv', 'w') as f:
     writer = csv.writer(f)
-    writer.writerow(['user_id', 'history_movie_title', 'history_movie_id', 'history_rating', 'movie_id', 'rating', 'timestamp'])
+    writer.writerow(headers)
     writer.writerows(sequential_interaction_list[:int(len(sequential_interaction_list)*0.8)])
 with open('./valid.csv', 'w') as f:
     writer = csv.writer(f)
-    writer.writerow(['user_id', 'history_movie_title', 'history_movie_id', 'history_rating', 'movie_id', 'rating', 'timestamp'])
+    writer.writerow(headers)
     writer.writerows(sequential_interaction_list[int(len(sequential_interaction_list)*0.8):int(len(sequential_interaction_list)*0.9)])
 with open('./test.csv', 'w') as f:
     writer = csv.writer(f)
-    writer.writerow(['user_id', 'history_movie_title', 'history_movie_id', 'history_rating', 'movie_id', 'rating', 'timestamp'])
+    writer.writerow(headers)
     writer.writerows(sequential_interaction_list[int(len(sequential_interaction_list)*0.9):])
 
 import json
 import pandas as pd
 import random
 import numpy as np
-def csv_to_json(input_path, output_path, sample=False):
+def csv_to_json(input_path, output_path, sample=False, sample_n=5000):
     data = pd.read_csv(input_path)
     if sample:
-        data = data.sample(n=5000, random_state=42).reset_index(drop=True)
-        data.to_csv(output_path[:-5] + ".csv", index=False)
+        data = data.sample(n=min(sample_n, len(data)), random_state=42).reset_index(drop=True)
+        # For sample, we keep the original ID?
+        # Requirement: "consistency". If we create a small dataset, it should be consistent.
+        # So we keep the ID from the full dataset.
+        data.to_csv(output_path.replace(".json", ".csv"), index=False)
+        
+    
+    # Optimize: avoid iterrows
+    # Pre-convert columns to lists for faster iteration
+    history_movie_ids = data['history_movie_id'].tolist()
+    history_movie_titles = data['history_movie_title'].tolist()
+    movie_ids = data['movie_id'].tolist()
+    ids = data['id'].tolist()
+    
     json_list = []
-    for index, row in data.iterrows():
-        row['history_movie_id'] = eval(row['history_movie_id'])
-        row['history_movie_title'] = eval(row['history_movie_title'])
-        L = len(row['history_movie_id'])
+    
+    # Use tqdm if available for progress
+    try:
+        from tqdm import tqdm
+        iterator = tqdm(zip(history_movie_ids, history_movie_titles, movie_ids, ids), total=len(data))
+    except ImportError:
+        iterator = zip(history_movie_ids, history_movie_titles, movie_ids, ids)
+        
+    for h_m_ids_str, h_m_titles_str, m_id, generated_id in iterator:
+        # Strict eval is slow, but necessary for these stringified lists?
+        # Maybe manual parsing if format is simple?
+        # They are just "['title1', 'title2']". 
+        # eval is likely the bottleneck too.
+        # But let's stick to eval for correctness as titles may contain commas etc.
+        # But we can try to optimize if needed.
+        # For now, just removing iterrows should give 10-50x speedup.
+        
+        row_history_movie_id = eval(h_m_ids_str)
+        row_history_movie_title = eval(h_m_titles_str)
+        
+        L = len(row_history_movie_id)
         history = "The user has watched the following movies before:"
         for i in range(L):
             if i == 0:
-                history += "\"" + row['history_movie_title'][i] + "\""
+                history += "\"" + row_history_movie_title[i] + "\""
             else:
-                history += ", \"" + row['history_movie_title'][i] + "\""
-        target_movie_name = "\"" + movie_dict[str(row['movie_id'])] + "\""
-        json_list.append({
+                history += ", \"" + str(row_history_movie_title[i]) + "\""
+                
+        target_movie_name = "\"" + movie_dict[str(m_id)] + "\""
+        
+        item_obj = {
+            "id": int(generated_id),
             "instruction": "Given a list of movies the user has watched before, please recommend a new movie that the user likes to the user.",
             "input": f"{history}\n ",
             "output": target_movie_name,
-        })    
+        }
+        json_list.append(item_obj)    
         
     with open(output_path, 'w') as f:
         json.dump(json_list, f, indent=4)
@@ -98,5 +156,6 @@ def csv_to_json(input_path, output_path, sample=False):
 csv_to_json('./train.csv', './train.json')
 csv_to_json('./valid.csv', './valid.json')
 csv_to_json('./test.csv', './test.json')
+csv_to_json('./train.csv', './train_5000.json', sample=True)
 csv_to_json('./valid.csv', './valid_5000.json', sample=True)
 csv_to_json('./test.csv', './test_5000.json', sample=True)

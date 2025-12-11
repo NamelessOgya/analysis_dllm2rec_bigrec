@@ -34,12 +34,14 @@ def load_metadata(meta_path):
     
     return id2title
 
-def convert_to_bigrec_format(df, output_path, id2title, split_type='train'):
-    print(f"Converting {split_type} to {output_path}...")
+def convert_to_bigrec_format(df, output_path, id2title, split_type='train', start_id=0):
+    print(f"Converting {split_type} to {output_path} with start_id={start_id}...")
     json_list = []
     
     # train_df has 'seq' (list of ints) and 'next' (int)
     # val/test csv has 'seq' (string representation of list) and 'next' (int)
+    
+    current_id = start_id
     
     for index, row in df.iterrows():
         seq = row['seq']
@@ -75,13 +77,17 @@ def convert_to_bigrec_format(df, output_path, id2title, split_type='train'):
         target_str = "\"" + str(target_title) + "\""
         
         json_list.append({
+            "id": current_id,
             "instruction": "Given a list of video games the user has played before, please recommend a new video game that the user likes to the user.",
             "input": f"{history_str}\n ",
             "output": target_str,
         })
+        current_id += 1
         
     with open(output_path, 'w') as f:
         json.dump(json_list, f, indent=4)
+    
+    return current_id
 
 def main():
     dllm2rec_dir = '../../../DLLM2Rec/data/game'
@@ -107,16 +113,51 @@ def main():
     else:
         print("Warning: id2name.txt not found! Using dummy titles.")
     
-    convert_to_bigrec_format(train_df, 'train.json', id2title, 'train')
-    convert_to_bigrec_format(val_df, 'valid.json', id2title, 'valid')
-    convert_to_bigrec_format(test_df, 'test.json', id2title, 'test')
+    # Use continuous IDs across splits
+    # train -> valid -> test
+    print("Generating train.json...")
+    next_id = convert_to_bigrec_format(train_df, 'train.json', id2title, 'train', start_id=1)
     
-    # Sample for 5000
+    print(f"Generating valid.json starting from id {next_id}...")
+    next_id = convert_to_bigrec_format(val_df, 'valid.json', id2title, 'valid', start_id=next_id)
+    
+    print(f"Generating test.json starting from id {next_id}...")
+    next_id = convert_to_bigrec_format(test_df, 'test.json', id2title, 'test', start_id=next_id)
+    
+    # Sample for 5000 (preserving their original ID is tricky if we want them to be a subset of valid/test)
+    # BUT the request asks for "small dataset creation".
+    # If we regenerate validation/test sample separately, their IDs will conflict if we start from 1.
+    # If we want them to be "subsets", we should sample from the generated JSONs?
+    # Or just assign new disjoint IDs for these "small" datasets?
+    # Usually "valid_5000" is a subset of valid.
+    # The requirement says: "game_bigrec形式のデータに対して、簡易的な検証を行えるようなsmall dataset作成をお願いします。"
+    # And: "verify ID consistency".
+    # So ideally, small dataset should have IDs that DO NOT overlap if used together, OR correspond to the full set?
+    # If it's a separate "small dataset", it probably counts as a separate "run".
+    # BUT, to test the "consistency", maybe we just want subsamples.
+    # Let's create train_5000 as well.
+    # And let's keep IDs consistent with the full set if possible?
+    # Actually, `convert_to_bigrec_format` currently iterates and assigns fresh IDs.
+    # If we sample `val_df` before passing to it, it gets new IDs.
+    # If we want the valid_5000 to be VALID SUBSET of `valid.json`, we should load `valid.json` and sample it.
+    # However, existing code was generating `valid_5000` from `val_df.sample`.
+    # Let's assume for `train_5000`, `valid_5000`, `test_5000`, we can just assign them fresh IDs starting from 1 or something,
+    # OR we treat them as a "small dataset suite" that is internally consistent.
+    # Let's create a "small dataset suite" with disjoint IDs: train_small -> valid_small -> test_small.
+    
+    print("Generating small dataset suite (train_5000, valid_5000, test_5000)...")
+    
+    train_sample = train_df.sample(n=min(5000, len(train_df)), random_state=42)
     val_sample = val_df.sample(n=min(5000, len(val_df)), random_state=42)
-    convert_to_bigrec_format(val_sample, 'valid_5000.json', id2title, 'valid_sample')
-    
     test_sample = test_df.sample(n=min(5000, len(test_df)), random_state=42)
-    convert_to_bigrec_format(test_sample, 'test_5000.json', id2title, 'test_sample')
+    
+    # Reset IDs for the small suite? Or keep them continuous?
+    # If we run verify_ids only on small suite, they must be unique.
+    # Let's make them unique within the suite.
+    small_start_id = 1
+    small_start_id = convert_to_bigrec_format(train_sample, 'train_5000.json', id2title, 'train_sample', start_id=small_start_id)
+    small_start_id = convert_to_bigrec_format(val_sample, 'valid_5000.json', id2title, 'valid_sample', start_id=small_start_id)
+    small_start_id = convert_to_bigrec_format(test_sample, 'test_5000.json', id2title, 'test_sample', start_id=small_start_id)
 
 if __name__ == '__main__':
     main()
