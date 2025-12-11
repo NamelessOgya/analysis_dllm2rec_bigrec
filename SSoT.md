@@ -123,3 +123,31 @@ DLLM2Recの学習・評価結果は以下の命名規則に従って保存され
 ## 5. シード管理
 *   再現性を担保するため、教師モデル（BIGRec）の学習・推論で使用したシード値を、生徒モデル（DLLM2Rec）の学習時にも同一の値として使用します。
 *   これにより、実験条件の完全な紐付けを行います。
+
+## 6. データ仕様
+
+### 6.1 データ前処理とユニークID
+*   **スクリプト**: `cmd/run_preprocess_data.sh`
+*   **実行引数**:
+    ```bash
+    ./cmd/run_preprocess_data.sh <DATASET>
+    ```
+    (例: `./cmd/run_preprocess_data.sh game`)
+*   **仕様**:
+    *   `train.json`, `valid.json`, `test.json` の全データに対して、Dataset全体でユニークな `id` (int) が付与されます。
+    *   IDは `train` -> `valid` -> `test` の順に連番で割り当てられ、Split間での重複はありません。
+    *   このIDはデータ不整合の検証等に使用されます。
+
+### 6.2 検証用スモールデータセット
+*   **スクリプト**: `cmd/create_small_dataset.sh`
+*   **実行引数**:
+    ```bash
+    ./cmd/create_small_dataset.sh <DATASET>
+    ```
+*   **出力**:
+    *   `BIGRec/data/[DATASET]_small/` ディレクトリを作成し、以下のファイルを生成します。
+        *   `train.json` (5000件)
+        *   `valid.json` (5000件)
+        *   `test.json` (5000件)
+        *   その他必要なメタデータファイル (`id2name.txt` 等)
+    *   ファイル名はフルセット（`game_bigrec` 等）と同一ですが、格納ディレクトリが `_small` となります。
