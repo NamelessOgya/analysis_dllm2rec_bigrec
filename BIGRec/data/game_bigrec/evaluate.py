@@ -16,6 +16,10 @@ parse.add_argument("--topk", type=int, default=200, help="topk for saving result
 parse.add_argument("--batch_size", type=int, default=16, help="batch size for embedding generation")
 parse.add_argument("--input_file", type=str, default=None, help="specific input file to process")
 parse.add_argument("--use_embedding_model", action="store_true", help="Use dedicated embedding model (e.g. E5)")
+parse.add_argument("--popularity_file", type=str, default=None, help="Path to popularity count json file")
+parse.add_argument("--popularity_file", type=str, default=None, help="Path to popularity count json file")
+parse.add_argument("--popularity_gamma", type=float, default=0.0, help="Gamma value for popularity adjustment")
+parse.add_argument("--validation_file", type=str, default=None, help="Path to validation result json for gamma tuning")
 args = parse.parse_args()
 
 path = []
@@ -52,6 +56,166 @@ item_ids = [_ for _ in range(len(item_names))]
 item_dict = dict(zip(item_names, item_ids))
 print("DEBUG: Items loaded.")
 import pandas as pd
+
+# Load Popularity Data Once if needed
+pop_rank_origin = None
+if args.popularity_file:
+    try:
+        print(f"DEBUG: Loading popularity data from {args.popularity_file}")
+        with open(args.popularity_file, 'r') as f_pop:
+            pop_count = json.load(f_pop)
+        
+        num_items = len(item_dict)
+        pop_rank_origin = torch.zeros(num_items)
+        
+        for item_name, count in pop_count.items():
+            if item_name in item_dict:
+                idx = item_dict[item_name]
+                pop_rank_origin[idx] = count
+        
+        if pop_rank_origin.sum() > 0:
+             pop_rank_origin = pop_rank_origin / pop_rank_origin.sum()
+             min_val = pop_rank_origin.min()
+             max_val = pop_rank_origin.max()
+             if max_val - min_val > 0:
+                 pop_rank_origin = (pop_rank_origin - min_val) / (max_val - min_val)
+        
+        if torch.cuda.is_available():
+             pop_rank_origin = pop_rank_origin.cuda()
+             
+    except Exception as e:
+        print(f"WARNING: Failed to load popularity data: {e}")
+        pop_rank_origin = None
+
+# Grid Search Logic
+if args.validation_file and pop_rank_origin is not None:
+    print(f"DEBUG: Starting Grid Search for Popularity Gamma using {args.validation_file}...")
+    if not os.path.exists(args.validation_file):
+        print(f"Error: Validation file {args.validation_file} not found.")
+        exit(1)
+        
+    with open(args.validation_file, 'r') as f:
+        valid_data = json.load(f)
+    
+    valid_text = [_["predict"][0].strip("\"") for _ in valid_data]
+    print("DEBUG: Generating validation embeddings...")
+    valid_embeddings = generate_embeddings(
+        valid_text, model, tokenizer, batch_size=args.batch_size, use_embedding_model=args.use_embedding_model
+    )
+    if torch.cuda.is_available():
+         valid_embeddings = valid_embeddings.cuda()
+    
+    # Load item embeddings (re-load for safety or reuse? reuse logic for simplicity)
+    if args.embedding_path:
+        embedding_file = args.embedding_path
+    else:
+        embedding_file = os.path.join(script_dir, "item_embedding.pt")
+    
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+    movie_embedding = torch.load(embedding_file, map_location=device)
+    if device == "cuda":
+        movie_embedding = movie_embedding.cuda()
+        
+    # Validation Distance
+    valid_dist = torch.cdist(valid_embeddings, movie_embedding, p=2)
+    
+    # Prepare Pop Rank for broadcasting [1, M]
+    pop_rank_tensor = pop_rank_origin.unsqueeze(0)
+    
+    best_gamma = 0.0
+    best_ndcg = -1.0
+    
+    # Search Range: 0.0 to 100.0, step 1.0 (following adjust_pda.py logic of /100 but loop 10000)
+    # adjust_pda.py: range(0, 10000, 100) -> 0, 100, 200.. -> /100 -> 0.0, 1.0, 2.0 ... 99.0
+    # This seems rough. Maybe 0.1 step is better? The user asked to "find best gamma".
+    # I'll stick to 1.0 step for speed as per reference, or maybe 0.5?
+    # Let's use 0.0 to 10.0 step 0.1, then 10 to 100 step 1?
+    # adjust_pda.py loop: `for g in range(0, 10000, 100): gamma = g/100` -> 0.0, 1.0, 2.0...
+    # This implies integer steps for gamma.
+    search_gammas = [g/10.0 for g in range(0, 1000, 1)] # 0.0 to 99.9 step 0.1
+    # Optimization: Batched evaluation or just simple loop?
+    # We do simple loop over gammas.
+    
+    # Helper to calc NDCG@20 only for speed
+    def calc_ndcg_20(rank_indices, data, item_dict):
+        S = 0
+        count = 0 
+        # Only calc average over the set
+        # This is slow in pure python.
+        # Vectorized implementation?
+        # Target IDs
+        target_ids = []
+        for d in data:
+            target_item = d['output'].strip("\"").strip(" ")
+            tid = item_dict.get(target_item)
+            target_ids.append(tid if tid is not None else -1)
+        target_ids = torch.tensor(target_ids, device=rank_indices.device).unsqueeze(1) # [B, 1]
+        
+        # Get rank of target
+        # rank_indices is [B, M] where value is ItemID at that rank?
+        # No. dist.argsort.argsort gives Rank (0-based) for each ItemID.
+        # rank_val = rank_indices.gather(1, target_ids)
+        # But target_ids might have -1.
+        
+        valid_mask = target_ids != -1
+        valid_targets = target_ids[valid_mask.squeeze()]
+        if len(valid_targets) == 0: return 0.0
+        
+        # We need the Rank of the Target Item.
+        # rank_indices[b, item_id] = rank
+        ranks = torch.gather(rank_indices[valid_mask.squeeze()], 1, valid_targets.unsqueeze(1))
+        
+        # NDCG@20
+        # if rank < 20: 1/log2(rank+2)
+        # ranks are 0-based
+        hits = (ranks < 20).float()
+        dcg = hits * (1.0 / torch.log2(ranks + 2.0))
+        # IDCG@20 is 1.0
+        return dcg.mean().item()
+
+    print("DEBUG: Searching optimal gamma (0.0 - 1.0, step 0.1)...")
+    # Reduced range for safety/speed in this context, 0-100 is huge.
+    # Usually around 0-2 is valid.
+    search_space = [x/10.0 for x in range(0, 11)] # 0.0 to 1.0 step 0.1
+    
+    for gamma in search_space:
+        # Apply adjustment
+        # rank = (1+pop)^(-gamma) * dist
+        # Note: In log space? No dist is Euclidean.
+        # Optimization: (1+pop)^(-gamma) can be precomputed but gamma changes.
+        adj = torch.pow((1 + pop_rank_tensor), -gamma)
+        adjusted_dist = dist * adj # Broadcasting
+        
+        # Get Ranks
+        # We only need the Rank of the Target Item
+        # rank = dist.argsort().argsort()
+        # This is expensive (sorting [B, M]).
+        # Can we do faster?
+        # For full evaluation we need sort.
+        # For 1k items? M is 29k for game.
+        # Validation size might be ~1k-5k.
+        # Sorting 5k * 30k is heavy.
+        
+        # Let's keep it simple: Just do it.
+        rank_indices = adjusted_dist.argsort(dim=-1).argsort(dim=-1)
+        
+        score = calc_ndcg_20(rank_indices, valid_data, item_dict)
+        # print(f"Gamma: {gamma}, NDCG@20: {score:.4f}")
+        
+        if score > best_ndcg:
+            best_ndcg = score
+            best_gamma = gamma
+            
+    print(f"DEBUG: Best Gamma found: {best_gamma} (NDCG@20: {best_ndcg:.4f})")
+    args.popularity_gamma = best_gamma
+    
+    # Save best gamma to file
+    with open('best_gamma.txt', 'w') as f_g:
+        f_g.write(str(best_gamma))
+    print("DEBUG: Saved best_gamma.txt")
 
 
 result_dict = dict()
@@ -104,6 +268,21 @@ for p in path:
     if device == "cuda":
         movie_embedding = movie_embedding.cuda()
 
+    # Prepare Popularity Adjustment Tensor
+    pop_adjustment = None
+    if pop_rank_origin is not None and args.popularity_gamma > 0:
+        print(f"DEBUG: Preparing popularity adjustment with gamma={args.popularity_gamma}")
+        try:
+             pop_rank_tensor = pop_rank_origin.unsqueeze(0) # [1, M] already handled in loading? No loading gave [M]
+             # pop_rank_origin is [M]
+             
+             # Pre-calculate adjustment factor: (1 + pop)^(-gamma)
+             pop_adjustment = torch.pow((1 + pop_rank_origin.unsqueeze(0)), -args.popularity_gamma) # [1, M]
+             print("DEBUG: Popularity adjustment tensor prepared.")
+            
+        except Exception as e:
+            print(f"WARNING: Failed to prepare popularity adjustment: {e}")
+
     # Prepare for saving results
     base_name = os.path.splitext(p)[0]
     rank_file = f"{base_name}_rank.txt"
@@ -142,6 +321,10 @@ for p in path:
             
         # Compute distance [B, N_items]
         dist = torch.cdist(batch_pred_emb, movie_embedding, p=2)
+
+        # Apply Popularity Adjustment if enabled
+        if pop_adjustment is not None:
+             dist = dist * pop_adjustment
         
         # Incremental Ranking Saving
         if args.save_results:

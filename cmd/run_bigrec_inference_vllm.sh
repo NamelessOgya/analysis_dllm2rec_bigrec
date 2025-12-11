@@ -214,8 +214,22 @@ if [ "$USE_POPULARITY" = "true" ]; then
     fi
     
     if [ -f "$POP_FILE" ]; then
+            # Validation File Path (Assume standard naming valid_epoch_best.json or valid.json inside result dir)
+            # If in directory mode (all/valid_test), it's in RESULT_DIR
+            # If in single file mode, it's also likely in valid_test logic or same dir
+            
+            VALID_RESULT_PATH="$RESULT_DIR/valid${EPOCH_SUFFIX}.json"
+            
             POP_ARGS="--popularity_file $POP_FILE --popularity_gamma $POPULARITY_GAMMA"
-            echo "Using Popularity Adjustment with gamma=$POPULARITY_GAMMA"
+            
+            if [ -f "$VALID_RESULT_PATH" ]; then
+                echo "Found validation file for grid search: $VALID_RESULT_PATH"
+                POP_ARGS="$POP_ARGS --validation_file $VALID_RESULT_PATH"
+            else
+                 echo "Using default gamma=$POPULARITY_GAMMA (Validation file $VALID_RESULT_PATH not found)"
+            fi
+            
+            echo "Popularity arguments: $POP_ARGS"
     fi
 fi
 
@@ -246,6 +260,11 @@ if [ -f "./${DATASET}.json" ]; then
     echo "Evaluation metrics saved to $RESULT_DIR/metrics.json"
 else
     echo "Warning: Evaluation output file ./${DATASET}.json not found."
+fi
+
+if [ -f "./best_gamma.txt" ]; then
+    mv "./best_gamma.txt" "$RESULT_DIR/best_gamma.txt"
+    echo "Best popularity gamma saved to $RESULT_DIR/best_gamma.txt"
 fi
 
 echo "BIGRec inference (vLLM) and evaluation completed."
