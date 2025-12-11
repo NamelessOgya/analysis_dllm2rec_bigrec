@@ -81,6 +81,9 @@ def convert_to_bigrec_format(df, output_path, id2title, split_type='train', star
             "instruction": "Given a list of video games the user has played before, please recommend a new video game that the user likes to the user.",
             "input": f"{history_str}\n ",
             "output": target_str,
+            "meta": {
+                "uid": current_id
+            }
         })
         current_id += 1
         
