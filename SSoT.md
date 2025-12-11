@@ -136,7 +136,9 @@ DLLM2Recの学習・評価結果は以下の命名規則に従って保存され
 *   **仕様**:
     *   `train.json`, `valid.json`, `test.json` の全データに対して、Dataset全体でユニークな `id` (int) が付与されます。
     *   IDは `train` -> `valid` -> `test` の順に連番で割り当てられ、Split間での重複はありません。
+    *   IDは `train` -> `valid` -> `test` の順に連番で割り当てられ、Split間での重複はありません。
     *   このIDはデータ不整合の検証等に使用されます。
+    *   **検証**: `python verify_data_alignment.py` を実行することで、生成された `train_data.df` と `train.json` のID不整合をチェックできます。
 
 
 ### 6.2 検証用スモールデータセット
@@ -191,6 +193,7 @@ DLLM2Recの学習・評価結果は以下の命名規則に従って保存され
 *   **Output**:
     *   `*_rank.txt`: **Common ID (1-based)** に変換されたランキング (Internal Index + 1)
     *   `*_score.txt`: スコア (距離/類似度)
+    *   `*_uid.txt`: 検証用ユニークID (train.jsonのmeta.uid)
 
 #### D. DLLM2Rec 蒸留学習 (Distillation Train)
 *   **Process**: `DLLM2Rec/main.py`

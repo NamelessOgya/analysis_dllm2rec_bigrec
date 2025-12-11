@@ -59,6 +59,10 @@ BIGRecとDLLM2Recの両方で完全に動作する、高品質なゲームデー
 # - BIGRec用JSONとDLLM2Rec用DataFrameを同時生成
 # - 論文の統計 (Items: 17,408, Seqs: 149,796) を再現
 docker exec dllm2rec_bigrec_container ./cmd/run_preprocess_game_bigrec.sh
+
+# 3. データ整合性の検証（推奨）
+# train_data.df と train.json のID順序が一致しているか検証します
+docker exec dllm2rec_bigrec_container python3 verify_data_alignment.py
 ```
 
 ### 3. データ前処理

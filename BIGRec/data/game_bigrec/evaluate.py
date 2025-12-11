@@ -108,13 +108,16 @@ for p in path:
     base_name = os.path.splitext(p)[0]
     rank_file = f"{base_name}_rank.txt"
     score_file = f"{base_name}_score.txt"
+    uid_file = f"{base_name}_uid.txt"
     
     f_rank = None
     f_score = None
+    f_uid = None
     if args.save_results:
         f_rank = open(rank_file, 'w')
         f_score = open(score_file, 'w')
-        print(f"DEBUG: Saving ranking results incrementally to {rank_file} and {score_file}...")
+        f_uid = open(uid_file, 'w')
+        print(f"DEBUG: Saving ranking results incrementally to {rank_file}, {score_file}, and {uid_file}...")
 
     # Evaluation Batch Size (for distance calc)
     eval_batch_size = 1024 
@@ -143,11 +146,6 @@ for p in path:
         # Incremental Ranking Saving
         if args.save_results:
             # We need top-k indices and values for saving
-            # And also we might need full rank for metrics? 
-            # Actually metrics calc below iterates items.
-            # Usually metrics need the rank position of the ground truth.
-            # Computing full argsort for huge items is still heavy [B, N_items].
-            # But [1024, 17000] is fine.
             pass
             
         # Calculate Rank for Metrics
@@ -166,6 +164,8 @@ for p in path:
             topk_indices_cpu = topk_indices.cpu().numpy() + 1 # Convert to 1-based ID
             topk_values_cpu = topk_values.cpu().numpy()
             
+            current_batch_size = batch_pred_emb.size(0)
+            
             for row in topk_indices_cpu:
                 line = ' '.join(map(str, row.tolist()))
                 f_rank.write(line + '\n')
@@ -173,12 +173,19 @@ for p in path:
             for row in topk_values_cpu:
                 line = ' '.join(map(str, row.tolist()))
                 f_score.write(line + '\n')
+                
+            # Write UIDs for this batch
+            for b in range(current_batch_size):
+                global_idx = start_idx + b
+                item_data = test_data[global_idx]
+                # Extract UID gracefully
+                uid = -1
+                if 'meta' in item_data and 'uid' in item_data['meta']:
+                    uid = item_data['meta']['uid']
+                f_uid.write(f"{uid}\n")
 
         # Compute Metrics
         # batch_rank is on GPU. move to CPU to avoid item access overhead? 
-        # or verify if item access on GPU is fast enough.
-        # Actually random access like `rank[i][target_id]` on GPU tensor from CPU scalar index is slow.
-        # Better move batch_rank to CPU.
         batch_rank_cpu = batch_rank.cpu()
         
         current_batch_size = batch_rank.size(0)
@@ -199,6 +206,7 @@ for p in path:
 
     if f_rank: f_rank.close()
     if f_score: f_score.close()
+    if f_uid: f_uid.close()
 
     NDCG = []
     HR = []
@@ -215,6 +223,7 @@ for p in path:
     if args.save_results:
          print(f"Saved rank to {rank_file}")
          print(f"Saved scores to {score_file}")
+         print(f"Saved uids to {uid_file}")
 
 f = open('./game_bigrec.json', 'w')    
 json.dump(result_dict, f, indent=4)
