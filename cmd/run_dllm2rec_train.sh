@@ -12,6 +12,13 @@ LAM=${5:-0.7}
 BIGREC_BASE_MODEL=${6:-""}
 BIGREC_SEED=${7:-0}
 BIGREC_SAMPLE=${8:-1024}
+BIGREC_EPOCH=${9:-"best"}
+
+if [ "$BIGREC_EPOCH" == "best" ]; then
+    BIGREC_EPOCH_SUFFIX="_epoch_best"
+else
+    BIGREC_EPOCH_SUFFIX="_epoch${BIGREC_EPOCH}"
+fi
 
 echo "Running DLLM2Rec training for dataset: $DATASET with model: $MODEL_NAME"
 echo "Params: ed_weight=$ED_WEIGHT, lam=$LAM"
@@ -24,9 +31,9 @@ if [ -n "$BIGREC_BASE_MODEL" ]; then
     
     # Construct paths
     EMBEDDING_PATH="$ROOT_DIR/BIGRec/data/$DATASET/model_embeddings/${SAFE_MODEL_NAME}.pt"
-    RESULT_DIR="$ROOT_DIR/BIGRec/results/$DATASET/$SAFE_MODEL_NAME/${BIGREC_SEED}_${BIGREC_SAMPLE}"
-    RANKING_PATH="$RESULT_DIR/train_rank.txt"
-    CONFIDENCE_PATH="$RESULT_DIR/train_score.txt"
+    RESULT_DIR="$ROOT_DIR/BIGRec/results/$DATASET/$SAFE_MODEL_NAME/${BIGREC_SEED}_${BIGREC_SAMPLE}${BIGREC_EPOCH_SUFFIX}"
+    RANKING_PATH="$RESULT_DIR/train${BIGREC_EPOCH_SUFFIX}_rank.txt"
+    CONFIDENCE_PATH="$RESULT_DIR/train${BIGREC_EPOCH_SUFFIX}_score.txt"
     
     # Check if files exist (optional but good for debugging)
     if [ ! -f "$RANKING_PATH" ]; then

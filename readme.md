@@ -193,8 +193,8 @@ BIGRecの推論結果（埋め込み表現やランキング情報）をDLLM2Rec
 BIGRecの知識を蒸留してSASRecなどの学生モデルを学習させます。
 
 ```bash
-# 引数: <dataset> <model_name> <gpu_id> <ed_weight> <lam> <bigrec_base_model> <bigrec_seed> <bigrec_sample>
-# デフォルト: game SASRec 0 0.3 0.7 "" 0 1024
+# 引数: <dataset> <model_name> <gpu_id> <ed_weight> <lam> <bigrec_base_model> <bigrec_seed> <bigrec_sample> <bigrec_epoch>
+# デフォルト: game SASRec 0 0.3 0.7 "" 0 1024 "best"
 
 # 例: Gameデータセット、SASRec、GPU 0で学習（デフォルトの蒸留重み）
 #     (事前に transfer_data.sh で配置したデータを使用)
@@ -205,7 +205,8 @@ BIGRecの知識を蒸留してSASRecなどの学生モデルを学習させま�
 
 # 例: BIGRecの結果ディレクトリを直接参照する場合 (推奨)
 #     (転送ステップ不要。参照するモデル名、Seed、Sample数を指定)
-./cmd/run_dllm2rec_train.sh game SASRec 0 0.3 0.7 "Qwen/Qwen2-0.5B" 0 1024
+#     第9引数にEpochサフィックス識別子（"best" または "10" など）を指定できます。
+./cmd/run_dllm2rec_train.sh game SASRec 0 0.3 0.7 "Qwen/Qwen2-0.5B" 0 1024 "best"
 ```
 ※ DLLM2Recのデフォルトデータセットは `game` になっていますが、前処理したデータセットに合わせて変更してください。
 

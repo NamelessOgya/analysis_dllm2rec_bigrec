@@ -120,7 +120,7 @@ else
     FILENAME=$(basename "$TEST_DATA")
     EXTENSION="${FILENAME##*.}"
     BASENAME="${FILENAME%.*}"
-    RESULT_JSON_PATH="$RESULT_DIR/${FILENAME}"
+    RESULT_JSON_PATH="$RESULT_DIR/${BASENAME}${EPOCH_SUFFIX}.${EXTENSION}"
 fi
 
 # Ensure result directory exists
@@ -189,6 +189,7 @@ else
         --batch_size "$BATCH_SIZE" \
         --tensor_parallel_size "$NUM_GPUS" \
         --limit "$LIMIT" \
+        --output_suffix "$EPOCH_SUFFIX" \
         $( [ -n "$PROMPT_FILE" ] && echo "--prompt_file $PROMPT_FILE" ) \
         $EXTRA_ARGS
 
