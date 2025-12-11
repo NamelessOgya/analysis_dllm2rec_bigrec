@@ -120,7 +120,15 @@ def save_csv(interactions):
     print("Saving CSV files...")
     interactions = sorted(interactions, key=lambda x: x[-1])
     
-    header = ['user_id', 'item_asins', 'item_asin', 'history_item_id', 'item_id', 'history_item_title', 'item_title', 'history_rating', 'rating', 'timestamp']
+    # Add unique ID to each interaction
+    # Current structure: [key, items, target, item_ids, target_id, item_titles, target_title, ratings, rating, timestamp]
+    # We will append uid to the end.
+    interactions_with_uid = []
+    for uid, row in enumerate(interactions):
+        interactions_with_uid.append(row + [uid])
+    interactions = interactions_with_uid
+
+    header = ['user_id', 'item_asins', 'item_asin', 'history_item_id', 'item_id', 'history_item_title', 'item_title', 'history_rating', 'rating', 'timestamp', 'uid']
     
     train_data = interactions[:int(len(interactions) * 0.8)]
     valid_data = interactions[int(len(interactions) * 0.8):int(len(interactions) * 0.9)]
@@ -147,13 +155,15 @@ def save_dllm2rec_data(train, valid, test, item_num):
     print("Generating DLLM2Rec data...")
     
     def process_split(data):
-        # data is list of [key, history_items, target_item, history_ids, target_id, ..., timestamp]
+        # data is list of [key, history_items, target_item, history_ids, target_id, ..., timestamp, uid]
         # index 3: history_ids (0-based list)
         # index 4: target_id (0-based int)
+        # index 10: uid
         processed = []
         for row in data:
             history_ids = row[3]
             target_id = row[4]
+            uid = row[10]
             
             # 1-based indexing for DLLM2Rec
             seq = [x + 1 for x in history_ids] 
@@ -172,7 +182,8 @@ def save_dllm2rec_data(train, valid, test, item_num):
             processed.append({
                 'seq': seq,
                 'len_seq': len_seq,
-                'next': next_item
+                'next': next_item,
+                'uid': uid
             })
         return pd.DataFrame(processed)
 
@@ -223,11 +234,15 @@ def csv_to_json(input_path, output_path, sample=False):
         
         target_item = str(row['item_title'])
         target_item_str = "\"" + target_item + "\""
+        uid = int(row['uid'])
         
         json_list.append({
             "instruction": "Given a list of video games the user has played before, please recommend a new video game that the user likes to the user.",
             "input": f"{history}\n ",
             "output": target_item_str,
+            "meta": {
+                "uid": uid
+            }
         })        
         
     with open(output_path, 'w') as f:
