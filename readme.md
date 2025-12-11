@@ -174,6 +174,12 @@ vLLMを使用して推論を高速に実行します。
 # 例: E5モデル (multilingual-e5-large) をアイテム埋め込みと予測評価に使用する場合
 # (第11引数をtrueに指定。プロンプトファイルがない場合は空文字 "" を指定)
 ./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" true
+
+# 例: 人気度バイアス調整 (Popularity Adjustment) を使用する場合
+# (第12引数: true, 第13引数: gamma初期値/デフォルト値)
+# 検証結果ファイル (valid_epoch_best.json等) が存在する場合、自動的にグリッドサーチ(gamma 0.0-1.0)を行い、
+# 最適なgamma値を探索して適用します。検証ファイルがない場合は、指定したgamma値をそのまま使用します。
+./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" false true 0.0
 ```
 
 ### 6. データ転送
