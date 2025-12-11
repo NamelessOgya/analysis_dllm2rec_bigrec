@@ -163,7 +163,7 @@ for p in path:
             topk_values = torch.gather(dist, 1, topk_indices) # [B, K]
             
             # Move to CPU for writing
-            topk_indices_cpu = topk_indices.cpu().numpy()
+            topk_indices_cpu = topk_indices.cpu().numpy() + 1 # Convert to 1-based ID
             topk_values_cpu = topk_values.cpu().numpy()
             
             for row in topk_indices_cpu:

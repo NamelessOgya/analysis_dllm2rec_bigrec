@@ -138,6 +138,7 @@ DLLM2Recの学習・評価結果は以下の命名規則に従って保存され
     *   IDは `train` -> `valid` -> `test` の順に連番で割り当てられ、Split間での重複はありません。
     *   このIDはデータ不整合の検証等に使用されます。
 
+
 ### 6.2 検証用スモールデータセット
 *   **スクリプト**: `cmd/create_small_dataset.sh`
 *   **実行引数**:
@@ -150,5 +151,53 @@ DLLM2Recの学習・評価結果は以下の命名規則に従って保存され
         *   `valid.json` (5000件)
         *   `test.json` (5000件)
         *   `train_5000.json`, `valid_5000.json`, `test_5000.json` (上記ファイルのコピー)
+        *   `train_data.df`, `val_data.csv`, `test_data.csv` (対応するDataFrameファイル)
         *   その他必要なメタデータファイル (`id2name.txt` 等)
     *   ファイル名はフルセット（`game_bigrec` 等）と同一ですが、格納ディレクトリが `_small` となります。
+
+## 7. データフローと参照ファイル (Detailed Data Flow)
+
+### 7.1 アイテムID定義 (SSoT)
+プロジェクト内で扱う「アイテムID」には2種類の定義が存在します。整合性を保つため、**BIGRecから外部に出力する際は必ず「共通ID (1-based)」に変換** します。
+
+| IDタイプ | 定義 | 使用箇所 | 備考 |
+| :--- | :--- | :--- | :--- |
+| **Internal Index** | **0-based** (0, 1, 2...) | BIGRec内部 (`process.py`, `train.py`, `create_pop_file.py`) | Pythonのリストインデックス等として使用 |
+| **Common ID** | **1-based** (1, 2, 3...) | DLLM2Rec内部 (`train_data.df`), **BIGRec出力ファイル (`rank.txt`)** | **SASRecのPadding(0)回避のため必須** |
+
+### 7.2処理ごとの参照ファイルマップ
+
+#### A. 前処理 (Preprocessing)
+*   **Process**: `BIGRec/data/[DATASET]/process.py`
+*   **Input**: Raw Data (JSON/CSV)
+*   **Output**:
+    *   `train.json` 等: テキストデータ (BIGRec学習用)
+    *   `id2name.txt`: **Title \t Internal Index (0-based)** (ID管理用)
+    *   `train_data.df`: **Common ID (1-based)** を含むDataFrame (DLLM2Rec学習用)
+
+#### B. BIGRec 学習 (Train)
+*   **Process**: `BIGRec/train.py`
+*   **Input**: `train.json`, `valid.json` (テキスト)
+*   **Output**: LoRA Weights (Adapter)
+
+#### C. BIGRec 推論・評価・蒸留データ生成 (Inference & Evaluate)
+*   **Process**: 
+    1. `BIGRec/inference_vllm.py` (推論)
+    2. `BIGRec/data/[DATASET]/evaluate.py` (評価&ランク生成)
+*   **Input**:
+    *   `train.json` (推論用プロンプト)
+    *   `id2name.txt` (生成されたTitleをInternal Indexに戻すため)
+    *   `model_embeddings/*.pt` (距離計算用)
+*   **Output**:
+    *   `*_rank.txt`: **Common ID (1-based)** に変換されたランキング (Internal Index + 1)
+    *   `*_score.txt`: スコア (距離/類似度)
+
+#### D. DLLM2Rec 蒸留学習 (Distillation Train)
+*   **Process**: `DLLM2Rec/main.py`
+*   **Input**:
+    *   `train_data.df`: **Common ID (1-based)** を正解ラベルとして持つ
+    *   `myrank_train.txt` (from BIGRec Input): **Common ID (1-based)** 化された教師ランキング
+    *   `confidence_train.txt`: 教師確信度
+*   **Logic**:
+    *   `train_data.df` の正解ID (例: 100) と、`rank.txt` の候補ID (例: 100) を直接比較・学習する。
+    *   **+1 などの補正は `main.py` 側では行わない** (Output側で担保するため)。

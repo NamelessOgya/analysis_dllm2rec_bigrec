@@ -27,12 +27,20 @@ bash "$PREPROCESS_SCRIPT" "$DATASET"
 
 # Verify outputs and create small dataset directory
 echo "Verifying and restructuring small dataset..."
-FILES=("train_5000.json" "valid_5000.json" "test_5000.json")
+JSON_FILES=("train_5000.json" "valid_5000.json" "test_5000.json")
+DF_FILES=("train_data_5000.df" "val_data_5000.csv" "test_data_5000.csv")
 MISSING=0
 
-for FILE in "${FILES[@]}"; do
+for FILE in "${JSON_FILES[@]}"; do
     if [ ! -f "$DATA_DIR/$FILE" ]; then
         echo "Error: $FILE not found in $DATA_DIR"
+        MISSING=1
+    fi
+done
+
+for FILE in "${DF_FILES[@]}"; do
+    if [ ! -f "$DATA_DIR/$FILE" ]; then
+        echo "Error: $FILE not found in "$DATA_DIR""
         MISSING=1
     fi
 done
@@ -47,8 +55,8 @@ SMALL_DATA_DIR="${DATA_DIR}_small"
 echo "Creating small dataset directory: $SMALL_DATA_DIR"
 mkdir -p "$SMALL_DATA_DIR"
 
-# Copy and rename files
-for FILE in "${FILES[@]}"; do
+# Copy and rename JSON files
+for FILE in "${JSON_FILES[@]}"; do
     SOURCE="$DATA_DIR/$FILE"
     
     # Copy with original name (e.g., train_5000.json)
@@ -60,6 +68,15 @@ for FILE in "${FILES[@]}"; do
     DEST="$SMALL_DATA_DIR/${BASE_NAME}.json"
     cp "$SOURCE" "$DEST"
 done
+
+# Copy and rename DataFrame files
+# train_data_5000.df -> train_data.df
+# val_data_5000.csv -> val_data.csv
+# test_data_5000.csv -> test_data.csv
+
+cp "$DATA_DIR/train_data_5000.df" "$SMALL_DATA_DIR/train_data.df"
+cp "$DATA_DIR/val_data_5000.csv" "$SMALL_DATA_DIR/val_data.csv"
+cp "$DATA_DIR/test_data_5000.csv" "$SMALL_DATA_DIR/test_data.csv"
 
 # Copy auxiliary files if they exist
 AUX_FILES=("id2name.txt" "movies.dat" "ratings.dat")

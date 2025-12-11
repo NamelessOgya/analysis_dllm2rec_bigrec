@@ -159,5 +159,10 @@ def main():
     small_start_id = convert_to_bigrec_format(val_sample, 'valid_5000.json', id2title, 'valid_sample', start_id=small_start_id)
     small_start_id = convert_to_bigrec_format(test_sample, 'test_5000.json', id2title, 'test_sample', start_id=small_start_id)
 
+    # Save sampled DataFrames for consistency with game_bigrec
+    print("Saving small dataset DataFrames...")
+    train_sample.to_pickle('train_data_5000.df')
+    val_sample.to_csv('val_data_5000.csv', index=False)
+    test_sample.to_csv('test_data_5000.csv', index=False)
 if __name__ == '__main__':
     main()
