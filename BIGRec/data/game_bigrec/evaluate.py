@@ -60,32 +60,27 @@ import pandas as pd
 # Load Popularity Data Once if needed
 pop_rank_origin = None
 if args.popularity_file:
-    try:
-        print(f"DEBUG: Loading popularity data from {args.popularity_file}")
-        with open(args.popularity_file, 'r') as f_pop:
-            pop_count = json.load(f_pop)
-        
-        num_items = len(item_dict)
-        pop_rank_origin = torch.zeros(num_items)
-        
-        for item_name, count in pop_count.items():
-            if item_name in item_dict:
-                idx = item_dict[item_name]
-                pop_rank_origin[idx] = count
-        
-        if pop_rank_origin.sum() > 0:
-             pop_rank_origin = pop_rank_origin / pop_rank_origin.sum()
-             min_val = pop_rank_origin.min()
-             max_val = pop_rank_origin.max()
-             if max_val - min_val > 0:
-                 pop_rank_origin = (pop_rank_origin - min_val) / (max_val - min_val)
-        
-        if torch.cuda.is_available():
-             pop_rank_origin = pop_rank_origin.cuda()
-             
-    except Exception as e:
-        print(f"WARNING: Failed to load popularity data: {e}")
-        pop_rank_origin = None
+    print(f"DEBUG: Loading popularity data from {args.popularity_file}")
+    with open(args.popularity_file, 'r') as f_pop:
+        pop_count = json.load(f_pop)
+    
+    num_items = len(item_dict)
+    pop_rank_origin = torch.zeros(num_items)
+    
+    for item_name, count in pop_count.items():
+        if item_name in item_dict:
+            idx = item_dict[item_name]
+            pop_rank_origin[idx] = count
+    
+    if pop_rank_origin.sum() > 0:
+            pop_rank_origin = pop_rank_origin / pop_rank_origin.sum()
+            min_val = pop_rank_origin.min()
+            max_val = pop_rank_origin.max()
+            if max_val - min_val > 0:
+                pop_rank_origin = (pop_rank_origin - min_val) / (max_val - min_val)
+    
+    if torch.cuda.is_available():
+            pop_rank_origin = pop_rank_origin.cuda()
 
 # Grid Search Logic
 print(f"DEBUG: Checking Grid Search Conditions: validation_file={args.validation_file}, pop_rank_loaded={pop_rank_origin is not None}")
