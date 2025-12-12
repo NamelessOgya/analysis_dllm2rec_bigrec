@@ -440,6 +440,38 @@ if __name__ == '__main__':
     num_rows = train_data.shape[0]
     num_batches = int(num_rows / args.batch_size)
 
+    # Determine output directory early to save .pt files
+    is_distilled = (args.ed_weight > 0 or args.lam > 0)
+    if is_distilled:
+        if args.teacher_model:
+            teacher_name = args.teacher_model.replace('/', '_')
+        else:
+            teacher_name = "unknown_teacher"
+        
+        # Parent directory: [DATASET]/[STUDENT_MODEL]_distilled_[TEACHER_MODEL]
+        parent_dir_name = f"{args.model_name.lower()}_distilled_{teacher_name}"
+        
+        # Hyperparameter directory: ed_[ED_WEIGHT]_lam_[LAM]
+        hyper_dir_name = f"ed_{args.ed_weight}_lam_{args.lam}"
+        
+        # Sub directory: [seed]_[TEACHER_SAMPLE]
+        if args.teacher_sample:
+            sub_dir_name = f"{args.seed}_{args.teacher_sample}"
+        else:
+             sub_dir_name = f"{args.seed}_unknown"
+             
+        # Order: Parent -> Seed/Sample -> Hyperparams
+        output_dir = os.path.join("results", args.data, parent_dir_name, sub_dir_name, hyper_dir_name)
+        
+    else:
+        # No distillation case
+        # [DATASET]/[STUDENT_MODEL]_no_distillation/[seed]/alpha_[ALPHA]
+        hyper_dir_name = f"alpha_{args.alpha}"
+        output_dir = os.path.join("results", args.data, f"{args.model_name.lower()}_no_distillation", str(args.seed), hyper_dir_name)
+
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"Results will be saved to: {output_dir}")
+
     for i in range(args.epoch):
         s_epoch = time.time()
         for j in range(num_batches):
@@ -584,7 +616,7 @@ if __name__ == '__main__':
             if step % 1 == 0:
                 print('VAL PHRASE:')
                 val_path = os.path.join(data_directory, 'val_data.csv')
-                _, val_hr_list, val_ndcg_list = myevaluate(model, val_path, device, llm_all_emb)
+                val_prediction, val_hr_list, val_ndcg_list = myevaluate(model, val_path, device, llm_all_emb)
                 print('TEST PHRASE:')
                 test_path = os.path.join(data_directory, 'test_data.csv')
                 s_test = time.time()
@@ -601,6 +633,11 @@ if __name__ == '__main__':
                     best_val_ndcg_list_result = val_ndcg_list
                     best_step = step
                     best_prediction = prediction
+                    
+                    # Save best predictions (CI scores)
+                    print(f"New best model found! Saving scores to {output_dir}...")
+                    torch.save(val_prediction, os.path.join(output_dir, "val.pt"))
+                    torch.save(prediction, os.path.join(output_dir, "test.pt"))
                 else:
                     patient += 1 
                 print(f'patient={patient}, BEST STEP:{best_step}, BEST NDCG@20:{best_ndcg20}, BEST HR@20:{best_hr20}, test cost:{e_test-s_test}s')

@@ -148,98 +148,57 @@ BIGRecモデル（LLM）のFine-tuningを行います。
 ### 6. BIGRecの推論 (vLLMによる高速化版)
 
 vLLMを使用して推論を高速に実行します。
+**引数がフラグ形式 (`--option value`) に刷新され、使いやすくなりました。**
 
 ```bash
-# 引数: <dataset> <gpu_id> <base_model> <seed> <sample> <skip_inference> <target_split> <batch_size> <limit> <prompt_file> <use_embedding_model> <use_popularity> <popularity_gamma> <checkpoint_epoch>
-# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" false false 0.0 "best"
+# 基本使用法
+./cmd/run_bigrec_inference_vllm.sh --dataset movie --gpu 0
 
-# 例: 基本的な実行（デフォルト設定、Best Model使用）
-./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B"
-
-# 例: 特定のEpoch (例: epoch 10) のチェックポイントを使用して推論
-# (第14引数にEpoch数を指定。出力ファイルには `_epoch10` が付与されます)
-./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" false false 0.0 10
-
-# 例: train.json の最初の100件のみを実行（テスト用）
-# 第9引数で limit を指定します
-./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "train.json" 16 100 "" false
-
-# 例: train.json 全件を実行（本番用）
-./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "train.json" 16 -1 "" false
-
-# 例: カスタムプロンプトを使用して推論する場合
-# (第10引数にプロンプトファイルのパスを指定)
-# ./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "my_templates/inference_prompt.txt"
-
-# 例: E5モデル (multilingual-e5-large) をアイテム埋め込みと予測評価に使用する場合
-# (第11引数をtrueに指定。プロンプトファイルがない場合は空文字 "" を指定)
-./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" true
-
-# 例: 人気度バイアス調整 (Popularity Adjustment) を使用する場合
-# (第12引数: true, 第13引数: gamma初期値/デフォルト値)
-# 検証結果ファイル (valid_epoch_best.json等) が存在する場合、自動的にグリッドサーチ(gamma 0.0-1.0)を行い、
-# 最適なgamma値を探索して適用します。検証ファイルがない場合は、指定したgamma値をそのまま使用します。
-./cmd/run_bigrec_inference_vllm.sh movie 0 "Qwen/Qwen2-0.5B" 0 1024 false "test_5000.json" 16 -1 "" false true 0.0
+# 主なオプション:
+#   --model <name>           ベースモデル (デフォルト: Qwen/Qwen2-0.5B)
+#   --checkpoint <epoch>     チェックポイント ("best" または Epoch数)
+#   --test_data <file>       対象データ ("test_5000.json", "all" など)
+#   --limit <int>            処理件数制限 (-1: 全件)
+#   --correction <type>      補正モード ("none", "popularity", "ci")
+#   --resource <path>        補正用リソース (人気度ファイル または CIスコアディレクトリ)
 ```
 
-### 6. データ転送
+**使用例:**
 
-BIGRecの推論結果（埋め込み表現やランキング情報）をDLLM2Recが利用できる形式で配置します。
-
+**1. 人気度バイアス調整 (Popularity Adjustment)**
+デフォルトのgamma (0.0) を指定してValidationセットで自動チューニングする場合:
 ```bash
-# 引数: <dataset> <gpu_id> <base_model> <seed> <sample>
-# デフォルト: movie 0 "Qwen/Qwen2-0.5B" 0 1024
-
-# 例: Qwenモデルの結果を転送
-./cmd/transfer_data.sh movie 0 "Qwen/Qwen2-0.5B"
+./cmd/run_bigrec_inference_vllm.sh \
+    --dataset movie \
+    --correction popularity
 ```
 
-### 7. DLLM2Recの学習
-
-BIGRecの知識を蒸留してSASRecなどの学生モデルを学習させます。
-
+**2. SASRec協調情報注入 (CI Injection)**
+別途学習したSASRecのスコア (val.pt/test.pt) を注入する場合:
 ```bash
-# 引数: <dataset> <model_name> <gpu_id> <ed_weight> <lam> <bigrec_base_model> <bigrec_seed> <bigrec_sample> <bigrec_epoch>
-# デフォルト: game SASRec 0 0.3 0.7 "" 0 1024 "best"
-
-# 例: Gameデータセット、SASRec、GPU 0で学習（デフォルトの蒸留重み）
-#     (事前に transfer_data.sh で配置したデータを使用)
-./cmd/run_dllm2rec_train.sh game SASRec 0
-
-# 例: 蒸留の重みを変更して学習 (ed_weight=0.5, lam=0.5)
-./cmd/run_dllm2rec_train.sh game SASRec 0 0.5 0.5
-
-# 例: BIGRecの結果ディレクトリを直接参照する場合 (推奨)
-#     (転送ステップ不要。参照するモデル名、Seed、Sample数を指定)
-#     第9引数にEpochサフィックス識別子（"best" または "10" など）を指定できます。
-./cmd/run_dllm2rec_train.sh game SASRec 0 0.3 0.7 "Qwen/Qwen2-0.5B" 0 1024 "best"
+./cmd/run_bigrec_inference_vllm.sh \
+    --dataset movie \
+    --correction ci \
+    --resource "DLLM2Rec/results/game/sasrec_no_distillation/2024/alpha_1.0/"
 ```
-※ DLLM2Recのデフォルトデータセットは `game` になっていますが、前処理したデータセットに合わせて変更してください。
+※ `resource` には `val.pt`, `test.pt` が保存されているディレクトリを指定します。Validationセットを用いて最適なgammaが自動探索されます。
 
+---
 
-### 8. DLLM2Recのハイパーパラメータ探索
+### 9. SASRecベースラインの実行 (＆ CI用スコア生成)
 
-`ed_weight` (Embedding Distillation) と `lam` (Ranking Distillation) のグリッドサーチを行い、最適な組み合わせを特定します。
-
-```bash
-# 引数: <dataset> <model_name> <gpu_id> <bigrec_base_model> <bigrec_seed> <bigrec_sample>
-./cmd/run_dllm2rec_hyparam_search.sh game SASRec 0 "Qwen/Qwen2-0.5B" 0 1024
-```
-*   `ed_weight`: 0.0 ~ 1.0 (0.2刻み)
-*   `lam`: 0.0 ~ 1.0 (0.2刻み)
-*   結果は各パラメータのディレクトリに保存され、最もHR@20が高かった設定が `best_params.json` として `results/.../[SEED]_[TEACHER_SAMPLE]/` 直下に保存されます。
-
-### 9. SASRecベースラインの実行
-
-蒸留を行わず、純粋なSASRecモデルを学習させてベースライン性能を測定します。
-出力されるmetrics.jsonのフォーマットはBIGRecと統一されており、`@1, @3, @5, @10, @20, @50` の6つのk値に対するスコアが記録されます（Early Stoppingは `@20` を基準に行われます）。
+SASRecモデルを学習させます。CI注入用のスコア生成にも使用します。
 
 ```bash
-# 引数: <dataset> <gpu_id> <epoch> <seed>
-# デフォルト: game 0 200 2024
+# 引数: <dataset> <gpu_id> <epoch> <seed> <alpha>
+# デフォルト: game 0 200 2024 0
 
-# 例: Gameデータセットでベースラインを実行 (Seed: 42)
-./cmd/run_sasrec_baseline.sh game 0 200 42
+# 例: Gameデータセットで学習 (alpha=0, 通常のSASRec)
+./cmd/run_sasrec_baseline.sh game 0 200 2024
+
+# 例: DROS用学習 (alpha=1.0) でスコアを生成
+# 結果は DLLM2Rec/results/.../alpha_1.0/ に保存されます
+./cmd/run_sasrec_baseline.sh game 0 200 2024 1.0
 ```
 
 ### 10. パイプライン実行（YAML設定ベース）

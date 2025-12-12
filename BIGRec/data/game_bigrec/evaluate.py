@@ -17,8 +17,11 @@ parse.add_argument("--batch_size", type=int, default=16, help="batch size for em
 parse.add_argument("--input_file", type=str, default=None, help="specific input file to process")
 parse.add_argument("--use_embedding_model", action="store_true", help="Use dedicated embedding model (e.g. E5)")
 parse.add_argument("--popularity_file", type=str, default=None, help="Path to popularity count json file")
-parse.add_argument("--popularity_gamma", type=float, default=0.0, help="Gamma value for popularity adjustment")
 parse.add_argument("--validation_file", type=str, default=None, help="Path to validation result json for gamma tuning")
+parse.add_argument("--ci_score_path", type=str, default=None, help="Directory containing SASRec scores (val.pt, test.pt)")
+# Gamma defaults to 0.0 which implies 'search' if validation available, or 'no adjustment' if 0 and static.
+# But user wants grid search.
+parse.add_argument("--manual_gamma", type=float, default=None, help="Manually specify gamma (overrides grid search)")
 args = parse.parse_args()
 print(f"DEBUG: Parsed Arguments: {args}")
 
@@ -57,6 +60,12 @@ item_dict = dict(zip(item_names, item_ids))
 print("DEBUG: Items loaded.")
 import pandas as pd
 
+# Exclusivity Check
+if args.popularity_file and args.ci_score_path:
+    print("Error: Cannot use both Popularity Adjustment and SASRec CI Injection simultaneously.")
+    print("Please specify only one.")
+    exit(1)
+
 # Load Popularity Data Once if needed
 pop_rank_origin = None
 if args.popularity_file:
@@ -90,19 +99,45 @@ if args.popularity_file:
     if torch.cuda.is_available():
             pop_rank_origin = pop_rank_origin.cuda()
 
-# Grid Search Logic
-print(f"DEBUG: Checking Grid Search Conditions: validation_file={args.validation_file}, pop_rank_loaded={pop_rank_origin is not None}")
-if args.validation_file and pop_rank_origin is not None:
-    print(f"DEBUG: Starting Grid Search for Popularity Gamma using {args.validation_file}...")
+# Helper to calc NDCG@20 only for speed
+def calc_ndcg_20(rank_indices, data, item_dict):
+    # Target IDs
+    target_ids = []
+    for d in data:
+        target_item = d['output'].strip("\"").strip(" ")
+        tid = item_dict.get(target_item)
+        target_ids.append(tid if tid is not None else -1)
+    target_ids = torch.tensor(target_ids, device=rank_indices.device) # [B]
+    
+    valid_mask = target_ids != -1
+    valid_targets = target_ids[valid_mask.view(-1)]
+    if len(valid_targets) == 0: return 0.0
+    
+    ranks = torch.gather(rank_indices[valid_mask.view(-1)], 1, valid_targets.unsqueeze(1))
+    
+    # NDCG@20
+    # if rank < 20: 1/log2(rank+2)
+    # ranks are 0-based
+    hits = (ranks < 20).float()
+    dcg = hits * (1.0 / torch.log2(ranks + 2.0))
+    # IDCG@20 is 1.0
+    return dcg.mean().item()
+
+# Shared Gamma Tuning/Selection Logic
+best_gamma = 0.0
+if args.manual_gamma is not None:
+    best_gamma = args.manual_gamma
+    print(f"DEBUG: Using manual gamma: {best_gamma}")
+elif args.validation_file:
+    # Load validation data once for tuning
     if not os.path.exists(args.validation_file):
         print(f"Error: Validation file {args.validation_file} not found.")
         exit(1)
-        
     with open(args.validation_file, 'r') as f:
         valid_data = json.load(f)
     
-    valid_text = [_["predict"][0].strip("\"") for _ in valid_data]
     print("DEBUG: Generating validation embeddings...")
+    valid_text = [_["predict"][0].strip("\"") for _ in valid_data]
     valid_embeddings = generate_embeddings(
         valid_text, model, tokenizer, batch_size=args.batch_size, use_embedding_model=args.use_embedding_model
     )
@@ -125,103 +160,107 @@ if args.validation_file and pop_rank_origin is not None:
         
     # Validation Distance
     valid_dist = torch.cdist(valid_embeddings, movie_embedding, p=2)
-    
-    # Prepare Pop Rank for broadcasting [1, M]
-    pop_rank_tensor = pop_rank_origin.unsqueeze(0)
-    
-    best_gamma = 0.0
-    best_ndcg = -1.0
-    
-    # Search Range: 0.0 to 100.0, step 1.0 (following adjust_pda.py logic of /100 but loop 10000)
-    # adjust_pda.py: range(0, 10000, 100) -> 0, 100, 200.. -> /100 -> 0.0, 1.0, 2.0 ... 99.0
-    # This seems rough. Maybe 0.1 step is better? The user asked to "find best gamma".
-    # I'll stick to 1.0 step for speed as per reference, or maybe 0.5?
-    # Let's use 0.0 to 10.0 step 0.1, then 10 to 100 step 1?
-    # adjust_pda.py loop: `for g in range(0, 10000, 100): gamma = g/100` -> 0.0, 1.0, 2.0...
-    # This implies integer steps for gamma.
-    search_gammas = [g/10.0 for g in range(0, 1000, 1)] # 0.0 to 99.9 step 0.1
-    # Optimization: Batched evaluation or just simple loop?
-    # We do simple loop over gammas.
-    
-    # Helper to calc NDCG@20 only for speed
-    def calc_ndcg_20(rank_indices, data, item_dict):
-        S = 0
-        count = 0 
-        # Only calc average over the set
-        # This is slow in pure python.
-        # Vectorized implementation?
-        # Target IDs
-        target_ids = []
-        for d in data:
-            target_item = d['output'].strip("\"").strip(" ")
-            tid = item_dict.get(target_item)
-            target_ids.append(tid if tid is not None else -1)
-        target_ids = torch.tensor(target_ids, device=rank_indices.device) # [B]
-        
-        # Get rank of target
-        # rank_indices is [B, M] where value is ItemID at that rank?
-        # No. dist.argsort.argsort gives Rank (0-based) for each ItemID.
-        # rank_val = rank_indices.gather(1, target_ids)
-        # But target_ids might have -1.
-        
-        valid_mask = target_ids != -1
-        valid_targets = target_ids[valid_mask.view(-1)]
-        if len(valid_targets) == 0: return 0.0
-        
-        # We need the Rank of the Target Item.
-        # rank_indices[b, item_id] = rank
-        # Use view(-1) to ensure mask is 1D
-        ranks = torch.gather(rank_indices[valid_mask.view(-1)], 1, valid_targets.unsqueeze(1))
-        
-        # NDCG@20
-        # if rank < 20: 1/log2(rank+2)
-        # ranks are 0-based
-        hits = (ranks < 20).float()
-        dcg = hits * (1.0 / torch.log2(ranks + 2.0))
-        # IDCG@20 is 1.0
-        return dcg.mean().item()
 
-    print("DEBUG: Searching optimal gamma (0.0 - 1.0, step 0.1)...")
-    # Reduced range for safety/speed in this context, 0-100 is huge.
-    # Usually around 0-2 is valid.
-    search_space = [x/10.0 for x in range(0, 11)] # 0.0 to 1.0 step 0.1
-    
-    for gamma in search_space:
-        # Apply adjustment
-        # rank = (1+pop)^(-gamma) * dist
-        # Note: In log space? No dist is Euclidean.
-        # Optimization: (1+pop)^(-gamma) can be precomputed but gamma changes.
-        adj = torch.pow((1 + pop_rank_tensor), -gamma)
-        adjusted_dist = valid_dist * adj # Broadcasting
+    if args.popularity_file and pop_rank_origin is not None:
+        print(f"DEBUG: Starting Grid Search for Popularity Gamma using {args.validation_file}...")
         
-        # Get Ranks
-        # We only need the Rank of the Target Item
-        # rank = dist.argsort().argsort()
-        # This is expensive (sorting [B, M]).
-        # Can we do faster?
-        # For full evaluation we need sort.
-        # For 1k items? M is 29k for game.
-        # Validation size might be ~1k-5k.
-        # Sorting 5k * 30k is heavy.
+        # Prepare Pop Rank for broadcasting [1, M]
+        pop_rank_tensor = pop_rank_origin.unsqueeze(0)
         
-        # Let's keep it simple: Just do it.
-        rank_indices = adjusted_dist.argsort(dim=-1).argsort(dim=-1)
+        best_ndcg = -1.0
+        search_space = [x/10.0 for x in range(0, 11)] # 0.0 to 1.0 step 0.1
         
-        score = calc_ndcg_20(rank_indices, valid_data, item_dict)
-        # print(f"Gamma: {gamma}, NDCG@20: {score:.4f}")
-        
-        if score > best_ndcg:
-            best_ndcg = score
-            best_gamma = gamma
+        print("DEBUG: Searching optimal gamma (0.0 - 1.0, step 0.1)...")
+        for gamma in search_space:
+            adj = torch.pow((1 + pop_rank_tensor), -gamma)
+            adjusted_dist = valid_dist * adj # Broadcasting
             
-    print(f"DEBUG: Best Gamma found: {best_gamma} (NDCG@20: {best_ndcg:.4f})")
-    args.popularity_gamma = best_gamma
+            rank_indices = adjusted_dist.argsort(dim=-1).argsort(dim=-1)
+            
+            score = calc_ndcg_20(rank_indices, valid_data, item_dict)
+            
+            if score > best_ndcg:
+                    best_ndcg = score
+                    best_gamma = gamma
+                    
+        print(f"DEBUG: Best Popularity Gamma found: {best_gamma} (NDCG@20: {best_ndcg:.4f})")
     
-    # Save best gamma to file
+    elif args.ci_score_path:
+        val_pt_path = os.path.join(args.ci_score_path, "val.pt")
+        if not os.path.exists(val_pt_path):
+             print(f"WARNING: val.pt not found at {val_pt_path}. Skipping CI tuning.")
+        else:
+            print("DEBUG: Tuning CI Gamma using validation set...")
+            # Load validation scores
+            ci_val = torch.load(val_pt_path)
+            if torch.cuda.is_available():
+                ci_val = ci_val.cuda()
+            
+            # Normalize CI scores (Min-Max)
+            ci_min = torch.min(ci_val, dim=1, keepdim=True)[0]
+            ci_max = torch.max(ci_val, dim=1, keepdim=True)[0]
+            ci_norm_val = (ci_val - ci_min) / (ci_max - ci_min + 1e-9) # Avoid div by zero
+            
+            # Check shapes
+            if valid_dist.shape != ci_norm_val.shape:
+                print(f"ERROR: Shape mismatch for CI tuning. Dist: {valid_dist.shape}, CI: {ci_norm_val.shape}")
+                print("WARNING: Skipping CI tuning due to shape mismatch.")
+            else:
+                search_gammas_ci = [x/10.0 for x in range(0, 50)] + [i for i in range(5, 20)] # 0.0-5.0 step 0.1, 5-20 step 1
+                
+                best_ci_ndcg = -1.0
+                
+                print("DEBUG: Searching optimal CI gamma...")
+                for g in search_gammas_ci:
+                    adj_ci = torch.pow((1 + ci_norm_val), -g)
+                    final_dist = valid_dist * adj_ci
+                    
+                    rank_indices = final_dist.argsort(dim=-1).argsort(dim=-1)
+                    score = calc_ndcg_20(rank_indices, valid_data, item_dict)
+                    
+                    if score > best_ci_ndcg:
+                        best_ci_ndcg = score
+                        best_gamma = g
+                
+                print(f"DEBUG: Best CI Gamma: {best_gamma} (NDCG@20: {best_ci_ndcg:.4f})")
+
+# Save best gamma to file
+if args.validation_file or args.manual_gamma is not None:
     with open('best_gamma.txt', 'w') as f_g:
         f_g.write(str(best_gamma))
     print("DEBUG: Saved best_gamma.txt")
 
+# SASRec CI Test Scores Loading
+ci_score_test = None
+if args.ci_score_path:
+    test_pt_path = os.path.join(args.ci_score_path, "test.pt")
+    if os.path.exists(test_pt_path):
+        print(f"DEBUG: Loading Test CI scores from {test_pt_path}")
+        ci_score_test = torch.load(test_pt_path)
+        if torch.cuda.is_available():
+            ci_score_test = ci_score_test.cuda()
+        
+        # Normalize Test Scores
+        ci_min = torch.min(ci_score_test, dim=1, keepdim=True)[0]
+        ci_max = torch.max(ci_score_test, dim=1, keepdim=True)[0]
+        ci_score_test = (ci_score_test - ci_min) / (ci_max - ci_min + 1e-9)
+    else:
+        print(f"WARNING: test.pt not found at {test_pt_path}. CI injection will be skipped for test.")
+        ci_score_test = None
+
+# Prepare Shared Adjustment Tensor for Popularity
+# This will be applied to the distance matrix.
+# For CI, the adjustment is query-dependent, so it's applied inside the loop.
+adjustment_tensor = None
+if args.popularity_file and pop_rank_origin is not None and best_gamma > 0:
+    print(f"DEBUG: Preparing popularity adjustment with gamma={best_gamma}")
+    try:
+         pop_rank_tensor = pop_rank_origin.unsqueeze(0) # [1, M]
+         adjustment_tensor = torch.pow((1 + pop_rank_tensor), -best_gamma) # [1, M]
+         print("DEBUG: Popularity adjustment tensor prepared.")
+        
+    except Exception as e:
+        print(f"WARNING: Failed to prepare popularity adjustment: {e}")
 
 result_dict = dict()
 for p in path:
@@ -273,21 +312,6 @@ for p in path:
     if device == "cuda":
         movie_embedding = movie_embedding.cuda()
 
-    # Prepare Popularity Adjustment Tensor
-    pop_adjustment = None
-    if pop_rank_origin is not None and args.popularity_gamma > 0:
-        print(f"DEBUG: Preparing popularity adjustment with gamma={args.popularity_gamma}")
-        try:
-             pop_rank_tensor = pop_rank_origin.unsqueeze(0) # [1, M] already handled in loading? No loading gave [M]
-             # pop_rank_origin is [M]
-             
-             # Pre-calculate adjustment factor: (1 + pop)^(-gamma)
-             pop_adjustment = torch.pow((1 + pop_rank_origin.unsqueeze(0)), -args.popularity_gamma) # [1, M]
-             print("DEBUG: Popularity adjustment tensor prepared.")
-            
-        except Exception as e:
-            print(f"WARNING: Failed to prepare popularity adjustment: {e}")
-
     # Prepare for saving results
     base_name = os.path.splitext(p)[0]
     rank_file = f"{base_name}_rank.txt"
@@ -317,6 +341,21 @@ for p in path:
     SS_list = {k: 0.0 for k in topk_list}
     LL = len(test_data)
     
+    # CI Alignment Check
+    ci_adjustment_tensor = None
+    if ci_score_test is not None and args.ci_gamma > 0:
+        if ci_score_test.shape[0] != predict_embeddings.shape[0]:
+             print(f"WARNING: CI Score shape {ci_score_test.shape} does not match test data shape {predict_embeddings.shape}. Skipping CI injection.")
+        else:
+             print(f"DEBUG: Applying CI injection with gamma={args.ci_gamma}")
+             # Pre-calculate factor if memory allows, or chunk it?
+             # (1 + ci)^(-gamma)
+             # ci_score_test is [N, M]
+             # We can process it in batches inside the loop to save memory if N*M is huge.
+             # But here we already have it in memory.
+             # Let's pass it to the loop.
+             pass
+
     print(f"DEBUG: Starting batched evaluation (Batch Size: {eval_batch_size})...")
     
     for batch_pred_emb, start_idx in tqdm(get_batches_tensor(predict_embeddings, eval_batch_size), total=(predict_embeddings.size(0) + eval_batch_size - 1) // eval_batch_size):
@@ -327,9 +366,21 @@ for p in path:
         # Compute distance [B, N_items]
         dist = torch.cdist(batch_pred_emb, movie_embedding, p=2)
 
-        # Apply Popularity Adjustment if enabled
-        if pop_adjustment is not None:
-             dist = dist * pop_adjustment
+        if adjustment_tensor is not None:
+             dist = dist * adjustment_tensor
+        
+        # Apply CI Adjustment if enabled (Mutually Exclusive handled before, but safe check)
+        # CI Score depends on Batch Slice
+        if ci_score_test is not None:
+             # Slice the CI scores matching this batch
+            end_idx = start_idx + batch_pred_emb.size(0)
+            if end_idx <= ci_score_test.shape[0]:
+                batch_ci = ci_score_test[start_idx:end_idx]
+                ci_adj = torch.pow((1 + batch_ci), -best_gamma)
+                dist = dist * ci_adj
+            else:
+                # Shape mismatch or overflow (shouldn't happen if validated)
+                pass
         
         # Incremental Ranking Saving
         if args.save_results:

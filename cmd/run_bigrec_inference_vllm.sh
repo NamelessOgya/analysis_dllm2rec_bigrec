@@ -1,26 +1,80 @@
+```bash
 #!/bin/bash
 
 # Exit on error
 set -e
 
-# Arguments
-# Arguments
-DATASET=${1:-movie}
-GPU_ID=${2:-0}
-BASE_MODEL=${3:-"Qwen/Qwen2-0.5B"}
-SEED=${4:-0}
-SAMPLE=${5:-1024}
-SKIP_INFERENCE=${6:-false}
-TEST_DATA=${7:-"test_5000.json"}
-BATCH_SIZE=${8:-16} # Kept for compatibility, though vLLM manages it internally
-LIMIT=${9:--1}      # New argument: Limit number of items to process (-1 for all)
-PROMPT_FILE=${10:-""}
-USE_EMBEDDING_MODEL=${11:-false}
-USE_POPULARITY=${12:-false}
-POPULARITY_GAMMA=${13:-0.0}
-CHECKPOINT_EPOCH=${14:-"best"}
+# Default Arguments
+DATASET="movie"
+GPU_ID="0"
+BASE_MODEL="Qwen/Qwen2-0.5B"
+SEED="0"
+SAMPLE="1024"
+SKIP_INFERENCE="false"
+BATCH_SIZE=16
+LIMIT=-1
+PROMPT_FILE=""
+USE_EMBEDDING_MODEL="false"
+CHECKPOINT_EPOCH="best"
+TEST_DATA="test_5000.json" # Default for test_data
 
-echo "Running BIGRec inference (vLLM) for dataset: $DATASET"
+# Correction Modes
+CORRECTION_MODE="none" # none, popularity, ci
+CORRECTION_RESOURCE=""  # path to pop file (optional override) or CI score directory
+MANUAL_GAMMA=""         # Optional manual gamma override
+
+# Helper function for usage
+usage() {
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "  --dataset <name>         Dataset name (default: movie)"
+    echo "  --gpu <ids>              GPU IDs (default: 0)"
+    echo "  --model <name>           Base model name (default: Qwen/Qwen2-0.5B)"
+    echo "  --seed <int>             Random seed (default: 0)"
+    echo "  --sample <int>           Sample size (default: 1024)"
+    echo "  --checkpoint <epoch>     Checkpoint epoch or 'best' (default: best)"
+    echo "  --test_data <file/mode>  Test file, 'all', or 'valid_test' (default: test_5000.json)"
+    echo "  --skip_inference         Skip inference, only evaluate (flag)"
+    echo "  --limit <int>            Limit number of items (-1 for all)"
+    echo "  --use_embedding_model    Use dedicated embedding model (flag)"
+    echo "  --correction <type>      Correction type: 'none', 'popularity', 'ci' (default: none)"
+    echo "  --resource <path>        Path to correction resource (CI dir or Pop file)"
+    echo "  --gamma <float>          Manual gamma override (default: auto/grid-search)"
+    echo "  --batch_size <int>       Batch size for evaluation (default: 16)"
+    echo "  -h, --help               Show this help message and exit"
+    exit 1
+}
+
+# Parse Arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --dataset) DATASET="$2"; shift ;;
+        --gpu) GPU_ID="$2"; shift ;;
+        --model) BASE_MODEL="$2"; shift ;;
+        --seed) SEED="$2"; shift ;;
+        --sample) SAMPLE="$2"; shift ;;
+        --checkpoint) CHECKPOINT_EPOCH="$2"; shift ;;
+        --test_data) TEST_DATA="$2"; shift ;;
+        --batch_size) BATCH_SIZE="$2"; shift ;; # Included for compatibility
+        --limit) LIMIT="$2"; shift ;;
+        --prompt_file) PROMPT_FILE="$2"; shift ;;
+        --skip_inference) SKIP_INFERENCE="true" ;;
+        --use_embedding_model) USE_EMBEDDING_MODEL="true" ;;
+        --correction) CORRECTION_MODE="$2"; shift ;;
+        --resource) CORRECTION_RESOURCE="$2"; shift ;;
+        --gamma) MANUAL_GAMMA="$2"; shift ;;
+        -h|--help) usage ;;
+        *) echo "Unknown parameter passed: $1"; usage ;;
+    esac
+    shift
+done
+
+echo "========================================================"
+echo "Running BIGRec Inference (vLLM)"
+echo "Dataset: $DATASET"
+echo "Model: $BASE_MODEL"
+echo "Correction Mode: $CORRECTION_MODE"
+echo "========================================================"
 
 # Sanitize model name for directory usage (replace / with _)
 SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
@@ -29,7 +83,6 @@ SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
 BIGREC_DIR="BIGRec"
 RESULT_DIR="BIGRec/results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
 DATA_DIR="BIGRec/data/$DATASET"
-# Result path calculation deferred until suffix is known
 
 # Construct LoRA weights path
 BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
@@ -39,10 +92,7 @@ EPOCH_SUFFIX="_epoch_best" # Default suffix
 # Check for specific checkpoint
 if [ -d "$BASE_LORA_PATH" ]; then
     if [ "$CHECKPOINT_EPOCH" == "best" ]; then
-        # Find directory named best_model_epoch_*
-        # We use sort to pick the one with highest epoch if multiple exist (though training usually saves one 'best')
         BEST_MODEL=$(find "$BASE_LORA_PATH" -maxdepth 1 -type d -name "best_model_epoch_*" | sort -V | tail -n 1)
-        
         if [ -n "$BEST_MODEL" ]; then
             echo "Found Best Model checkpoint: $BEST_MODEL"
             LORA_WEIGHTS="$BEST_MODEL"
@@ -52,17 +102,13 @@ if [ -d "$BASE_LORA_PATH" ]; then
             exit 1
         fi
     else
-        # User specified a specific epoch
         TARGET_EPOCH="$CHECKPOINT_EPOCH"
         EPOCH_SUFFIX="_epoch${TARGET_EPOCH}"
-        
-        # 1. Check if best_model_epoch_X exists
         SPECIFIC_BEST="${BASE_LORA_PATH}/best_model_epoch_${TARGET_EPOCH}"
         if [ -d "$SPECIFIC_BEST" ]; then
              echo "Found specified epoch in best model: $SPECIFIC_BEST"
              LORA_WEIGHTS="$SPECIFIC_BEST"
         else
-             # 2. Search in checkpoint-* directories via trainer_state.json
              FOUND_CHECKPOINT=""
              echo "Searching for epoch $TARGET_EPOCH in checkpoints..."
              
@@ -70,7 +116,6 @@ if [ -d "$BASE_LORA_PATH" ]; then
                  if [ -d "$d" ]; then
                      STATE_FILE="$d/trainer_state.json"
                      if [ -f "$STATE_FILE" ]; then
-                         # python one-liner to extract epoch (as float)
                          CHECK_EPOCH=$(python -c "import json; 
 try:
     with open('$STATE_FILE') as f: data = json.load(f); 
@@ -103,20 +148,14 @@ TEST_DATA_PATH="$DATA_DIR/$TEST_DATA"
 if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
     TEST_DATA_PATH="$TEST_DATA"
     RESULT_JSON_PATH="$RESULT_DIR" # Output to directory
-    
-    # Pass dataset argument required by inference_vllm.py for these modes
     EXTRA_ARGS="--dataset $DATASET"
 else
     # Check if test data exists (only for specific files)
     if [ ! -f "$TEST_DATA_PATH" ]; then
         echo "Error: Test data not found at $TEST_DATA_PATH"
-        echo "Please run data preprocessing first (e.g., ./cmd/run_preprocess_data.sh $DATASET)."
         exit 1
     fi
     EXTRA_ARGS=""
-    
-    # Single file mode: Append suffix to filename
-    # Extract extension and base
     FILENAME=$(basename "$TEST_DATA")
     EXTENSION="${FILENAME##*.}"
     BASENAME="${FILENAME%.*}"
@@ -126,13 +165,11 @@ fi
 # Ensure result directory exists
 mkdir -p "$RESULT_DIR"
 
-# Check if LoRA weights exist
+# Check LoRA
 if [ ! -d "$LORA_WEIGHTS" ]; then
     echo "Error: LoRA weights not found at $LORA_WEIGHTS"
-    echo "Please check your arguments (dataset, model, seed, sample) or run training first."
     exit 1
 fi
-
 echo "Using LoRA weights from: $LORA_WEIGHTS"
 echo "Outputting results to: $RESULT_DIR"
 
@@ -154,7 +191,6 @@ EMBEDDING_DIR="BIGRec/data/$DATASET/model_embeddings"
 EMBEDDING_FILE="$EMBEDDING_DIR/${SAFE_EVAL_MODEL_NAME}.pt"
 
 if [ ! -f "$EMBEDDING_FILE" ]; then
-    echo "Item embedding file not found at $EMBEDDING_FILE"
     echo "Generating item embeddings..."
     export CUDA_VISIBLE_DEVICES=$GPU_ID
     python BIGRec/data/generate_embeddings.py \
@@ -172,15 +208,13 @@ fi
 
 # Run inference with vLLM
 if [ "$SKIP_INFERENCE" = "true" ]; then
-    echo "Skipping inference step as requested."
+    echo "Skipping inference step."
 else
-    # Calculate number of GPUs
     IFS=',' read -ra GPU_ARRAY <<< "$GPU_ID"
     NUM_GPUS=${#GPU_ARRAY[@]}
     echo "Using $NUM_GPUS GPUs: $GPU_ID"
     echo "Processing limit: $LIMIT"
-
-    # Note: vLLM manages GPU memory aggressively. We set CUDA_VISIBLE_DEVICES.
+    
     CUDA_VISIBLE_DEVICES=$GPU_ID python BIGRec/inference_vllm.py \
         --base_model "$BASE_MODEL" \
         --lora_weights "$LORA_WEIGHTS" \
@@ -192,19 +226,38 @@ else
         --output_suffix "$EPOCH_SUFFIX" \
         $( [ -n "$PROMPT_FILE" ] && echo "--prompt_file $PROMPT_FILE" ) \
         $EXTRA_ARGS
-
 fi
 
-echo "Inference completed (or skipped). Running evaluation..."
+echo "Inference completed. Running evaluation..."
 
-# Popularity Arguments Setup
-POP_ARGS=""
-if [ "$USE_POPULARITY" = "true" ]; then
+# Correction Arguments Setup
+EVAL_ARGS=""
+
+# Logic for finding validation file for grid search
+VALID_FILE=""
+if [ -f "$RESULT_DIR/valid_epoch_best.json" ]; then VALID_FILE="$RESULT_DIR/valid_epoch_best.json"; fi
+if [ -f "$RESULT_DIR/valid.json" ]; then VALID_FILE="$RESULT_DIR/valid.json"; fi
+if [ -f "$RESULT_DIR/valid_test.json" ]; then VALID_FILE="$RESULT_DIR/valid_test.json"; fi 
+
+if [ -n "$VALID_FILE" ]; then
+    echo "Using Validation File for Grid Search: $VALID_FILE"
+    EVAL_ARGS="$EVAL_ARGS --validation_file $VALID_FILE"
+else
+    echo "WARNING: No validation file found in $RESULT_DIR. Grid search may fail if enabled."
+fi
+
+# Manual Gamma
+if [ -n "$MANUAL_GAMMA" ]; then
+    EVAL_ARGS="$EVAL_ARGS --manual_gamma $MANUAL_GAMMA"
+    echo "Using manual gamma: $MANUAL_GAMMA"
+fi
+
+if [ "$CORRECTION_MODE" == "popularity" ]; then
     POP_FILE="BIGRec/data/$DATASET/pop_count.json"
+    if [ -n "$CORRECTION_RESOURCE" ]; then POP_FILE="$CORRECTION_RESOURCE"; fi
     
-    # Check and generate if missing
     if [ ! -f "$POP_FILE" ]; then
-        echo "Popularity file $POP_FILE not found. Generating..."
+        echo "Generating popularity file..."
         if [ -f "$DATA_DIR/train.json" ]; then
             python BIGRec/data/create_pop_file.py --train_file "$DATA_DIR/train.json" --output_file "$POP_FILE"
             echo "Generated $POP_FILE"
@@ -214,24 +267,23 @@ if [ "$USE_POPULARITY" = "true" ]; then
     fi
     
     if [ -f "$POP_FILE" ]; then
-            # Validation File Path (Assume standard naming valid_epoch_best.json or valid.json inside result dir)
-            # If in directory mode (all/valid_test), it's in RESULT_DIR
-            # If in single file mode, it's also likely in valid_test logic or same dir
-            
-            VALID_RESULT_PATH="$RESULT_DIR/valid${EPOCH_SUFFIX}.json"
-            
-            POP_ARGS="--popularity_file $POP_FILE --popularity_gamma $POPULARITY_GAMMA"
-            
-            if [ -f "$VALID_RESULT_PATH" ]; then
-                echo "Found validation file for grid search: $VALID_RESULT_PATH"
-                POP_ARGS="$POP_ARGS --validation_file $VALID_RESULT_PATH"
-            else
-                 echo "Using default gamma=$POPULARITY_GAMMA (Validation file $VALID_RESULT_PATH not found)"
-            fi
-            
-            echo "Popularity arguments: $POP_ARGS"
+        EVAL_ARGS="$EVAL_ARGS --popularity_file $POP_FILE"
+        echo "Correction: Popularity (File: $POP_FILE)"
+    else
+        echo "WARNING: Popularity file not found or generated. Skipping popularity correction."
     fi
+    
+elif [ "$CORRECTION_MODE" == "ci" ]; then
+    CI_PATH="$CORRECTION_RESOURCE"
+    if [ -z "$CI_PATH" ] || [ ! -d "$CI_PATH" ]; then
+        echo "Error: CI Correction requires a valid directory via --resource. Provided: $CI_PATH"
+        exit 1
+    fi
+    
+    EVAL_ARGS="$EVAL_ARGS --ci_score_path $CI_PATH"
+    echo "Correction: SASRec CI (Path: $CI_PATH)"
 fi
+
 
 # Run evaluation
 if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
@@ -242,7 +294,7 @@ if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
         --embedding_path "$EMBEDDING_FILE" \
         --save_results \
         --batch_size "$BATCH_SIZE" \
-        $EXTRA_EMBED_ARGS $POP_ARGS
+        $EXTRA_EMBED_ARGS $EVAL_ARGS
 else
     # Single file mode
     CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
@@ -252,19 +304,16 @@ else
         --save_results \
         --batch_size "$BATCH_SIZE" \
         --input_file "$RESULT_JSON_PATH" \
-        $EXTRA_EMBED_ARGS $POP_ARGS
+        $EXTRA_EMBED_ARGS $EVAL_ARGS
 fi
 
+# Saving metrics (backwards compat)
 if [ -f "./${DATASET}.json" ]; then
     mv "./${DATASET}.json" "$RESULT_DIR/metrics.json"
-    echo "Evaluation metrics saved to $RESULT_DIR/metrics.json"
-else
-    echo "Warning: Evaluation output file ./${DATASET}.json not found."
 fi
-
 if [ -f "./best_gamma.txt" ]; then
     mv "./best_gamma.txt" "$RESULT_DIR/best_gamma.txt"
-    echo "Best popularity gamma saved to $RESULT_DIR/best_gamma.txt"
 fi
 
 echo "BIGRec inference (vLLM) and evaluation completed."
+```

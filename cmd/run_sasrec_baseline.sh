@@ -4,12 +4,14 @@
 set -e
 
 # Arguments
+# Arguments
 DATASET=${1:-game}
 GPU_ID=${2:-0}
 EPOCH=${3:-200}
 SEED=${4:-2024}
+ALPHA=${5:-0}
 
-echo "Running SASRec baseline for dataset: $DATASET on GPU: $GPU_ID with Seed: $SEED"
+echo "Running SASRec baseline for dataset: $DATASET on GPU: $GPU_ID with Seed: $SEED and Alpha: $ALPHA"
 
 # Define paths
 DLLM2REC_DIR="DLLM2Rec"
@@ -23,7 +25,7 @@ python main.py \
     --data "$DATASET" \
     --model_name "SASRec" \
     --epoch "$EPOCH" \
-    --alpha 0 \
+    --alpha "$ALPHA" \
     --ed_weight 0 \
     --lam 0 \
     --cuda "$GPU_ID" \

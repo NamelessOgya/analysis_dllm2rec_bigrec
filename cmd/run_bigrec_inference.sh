@@ -18,6 +18,8 @@ USE_EMBEDDING_MODEL=${10:-false}
 USE_POPULARITY=${11:-false}
 POPULARITY_GAMMA=${12:-0.0}
 CHECKPOINT_EPOCH=${13:-"best"}
+CI_SCORE_PATH=${14:-""}
+CI_GAMMA=${15:-0.0}
 
 echo "Running BIGRec inference for dataset: $DATASET"
 
@@ -230,6 +232,32 @@ with open(path, 'w') as f: json.dump(data, f, indent=4)"
         fi
     fi
 
+    # CI Injection Arguments Setup
+    CI_ARGS=""
+    if [ -n "$CI_SCORE_PATH" ]; then
+        if [ -d "$CI_SCORE_PATH" ]; then
+            CI_ARGS="--ci_score_path $CI_SCORE_PATH --ci_gamma $CI_GAMMA"
+            
+            IS_ZERO=$(python -c "print(1 if float($CI_GAMMA) == 0.0 else 0)")
+            if [ "$IS_ZERO" -eq 1 ]; then
+                 CI_ARGS="$CI_ARGS --enable_ci_tuning"
+                 echo "Enabled CI Gamma Tuning (since CI_GAMMA=0.0)"
+                 
+                 VALID_FILE=""
+                 if [ -f "$RESULT_DIR/valid_epoch_best.json" ]; then VALID_FILE="$RESULT_DIR/valid_epoch_best.json"; fi
+                 if [ -f "$RESULT_DIR/valid.json" ]; then VALID_FILE="$RESULT_DIR/valid.json"; fi
+                 if [ -f "$RESULT_DIR/valid_test.json" ]; then VALID_FILE="$RESULT_DIR/valid_test.json"; fi # valid_test mode output
+
+                 if [ -n "$VALID_FILE" ]; then
+                      CI_ARGS="$CI_ARGS --validation_file $VALID_FILE"
+                 fi
+            fi
+            echo "Using CI Injection: $CI_ARGS"
+        else
+            echo "WARNING: CI Score Path $CI_SCORE_PATH is not a directory. Skipping CI injection."
+        fi
+    fi
+
     # Run evaluation
     SECONDS=0
     CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
@@ -238,7 +266,8 @@ with open(path, 'w') as f: json.dump(data, f, indent=4)"
         --embedding_path "$EMBEDDING_FILE" \
         --save_results \
         --batch_size "$BATCH_SIZE" \
-        $EXTRA_EMBED_ARGS $POP_ARGS
+        --batch_size "$BATCH_SIZE" \
+        $EXTRA_EMBED_ARGS $POP_ARGS $CI_ARGS
     duration=$SECONDS
     duration_min=$(($duration / 60))
     echo "Teacher model accuracy evaluation time: $duration_min minutes"
