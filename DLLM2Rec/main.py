@@ -761,10 +761,10 @@ if __name__ == '__main__':
         torch.save(train_pred, os.path.join(output_dir, "train.pt"))
         torch.save(torch.LongTensor(train_uids), os.path.join(output_dir, "train_uids.pt"))
         print("Export Complete.")
-                if patient >= 10:
-                    e = time.time()
-                    cost = (e - s)/60
-                    print(f'=============early stop=============')
-                    print(f'cost {cost} min')
-                    save_metrics(args, best_hr_list_result, best_ndcg_list_result, best_val_hr_list_result, best_val_ndcg_list_result)
-                    exit(0)
+        if patient >= 10:
+            e = time.time()
+            cost = (e - s)/60
+            print(f'=============early stop=============')
+            print(f'cost {cost} min')
+            save_metrics(args, best_hr_list_result, best_ndcg_list_result, best_val_hr_list_result, best_val_ndcg_list_result)
+            exit(0)
