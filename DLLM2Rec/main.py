@@ -207,6 +207,7 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
     states = []
     len_states = []
     actions = []
+    uids = []
     total_purchase = 0
     import csv
     with open(test_data, 'r') as file:
@@ -218,6 +219,8 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
             states.append(seq)
             len_states.append(len_seq)
             actions.append(next_item)
+            if 'uid' in row:
+                uids.append(int(row['uid']))
             total_purchase += 1
 
     states = np.array(states)
@@ -271,7 +274,7 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
     values_str = '\t'.join(['{:.6f}\t{:.6f}'.format(h, n) for h, n in zip(hr_list, ndcg_list)])
     print(values_str)
     print('#' * 120)
-    return prediction, hr_list, ndcg_list
+    return prediction, hr_list, ndcg_list, uids
 
 def calcu_propensity_score(buffer):
     items = list(buffer['next'])
@@ -616,11 +619,11 @@ if __name__ == '__main__':
             if step % 1 == 0:
                 print('VAL PHRASE:')
                 val_path = os.path.join(data_directory, 'val_data.csv')
-                val_prediction, val_hr_list, val_ndcg_list = myevaluate(model, val_path, device, llm_all_emb)
+                val_prediction, val_hr_list, val_ndcg_list, val_uids = myevaluate(model, val_path, device, llm_all_emb)
                 print('TEST PHRASE:')
                 test_path = os.path.join(data_directory, 'test_data.csv')
                 s_test = time.time()
-                prediction, hr_list, ndcg_list = myevaluate(model, test_path, device, llm_all_emb)
+                prediction, hr_list, ndcg_list, test_uids = myevaluate(model, test_path, device, llm_all_emb)
                 e_test = time.time()
                 # Assuming topk=[1, 3, 5, 10, 20, 50], index 4 is @20
                 if ndcg_list[4] > best_ndcg20:
@@ -638,6 +641,8 @@ if __name__ == '__main__':
                     print(f"New best model found! Saving scores to {output_dir}...")
                     torch.save(val_prediction, os.path.join(output_dir, "val.pt"))
                     torch.save(prediction, os.path.join(output_dir, "test.pt"))
+                    torch.save(torch.LongTensor(val_uids), os.path.join(output_dir, "val_uids.pt"))
+                    torch.save(torch.LongTensor(test_uids), os.path.join(output_dir, "test_uids.pt"))
                 else:
                     patient += 1 
                 print(f'patient={patient}, BEST STEP:{best_step}, BEST NDCG@20:{best_ndcg20}, BEST HR@20:{best_hr20}, test cost:{e_test-s_test}s')

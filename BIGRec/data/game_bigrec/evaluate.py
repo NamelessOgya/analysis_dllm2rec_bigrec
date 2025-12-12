@@ -203,6 +203,24 @@ elif args.validation_file:
             ci_max = torch.max(ci_val, dim=1, keepdim=True)[0]
             ci_norm_val = (ci_val - ci_min) / (ci_max - ci_min + 1e-9) # Avoid div by zero
             
+            # UID Alignment for Validation
+            val_uids_path = os.path.join(args.ci_score_path, "val_uids.pt")
+            if os.path.exists(val_uids_path):
+                print(f"DEBUG: Aligning Validation CI Scores using UIDs from {val_uids_path}")
+                val_uids = torch.load(val_uids_path)
+                if isinstance(val_uids, torch.Tensor): val_uids = val_uids.tolist()
+                val_uid2idx = {uid: i for i, uid in enumerate(val_uids)}
+                
+                aligned_indices = []
+                for item in valid_data:
+                    uid = item.get('meta', {}).get('uid', -1)
+                    if uid in val_uid2idx:
+                        aligned_indices.append(val_uid2idx[uid])
+                    else:
+                        print(f"WARNING: UID {uid} not found in val results, using index 0 (score might be wrong)")
+                        aligned_indices.append(0)
+                ci_norm_val = ci_norm_val[aligned_indices]
+
             # Check shapes
             if valid_dist.shape != ci_norm_val.shape:
                 print(f"ERROR: Shape mismatch for CI tuning. Dist: {valid_dist.shape}, CI: {ci_norm_val.shape}")
@@ -246,6 +264,15 @@ if args.ci_score_path:
         ci_min = torch.min(ci_score_test, dim=1, keepdim=True)[0]
         ci_max = torch.max(ci_score_test, dim=1, keepdim=True)[0]
         ci_score_test = (ci_score_test - ci_min) / (ci_max - ci_min + 1e-9)
+        
+        # Load Test UIDs if available
+        test_uids_path = os.path.join(args.ci_score_path, "test_uids.pt")
+        test_uid2idx = None
+        if os.path.exists(test_uids_path):
+             print(f"DEBUG: Loading Test UIDs from {test_uids_path} for alignment...")
+             test_uids = torch.load(test_uids_path)
+             if isinstance(test_uids, torch.Tensor): test_uids = test_uids.tolist()
+             test_uid2idx = {uid: i for i, uid in enumerate(test_uids)}
     else:
         print(f"WARNING: test.pt not found at {test_pt_path}. CI injection will be skipped for test.")
         ci_score_test = None
@@ -373,16 +400,30 @@ for p in path:
         
         # Apply CI Adjustment if enabled (Mutually Exclusive handled before, but safe check)
         # CI Score depends on Batch Slice
+        # Apply CI Adjustment if enabled
         if ci_score_test is not None:
-             # Slice the CI scores matching this batch
-            end_idx = start_idx + batch_pred_emb.size(0)
-            if end_idx <= ci_score_test.shape[0]:
-                batch_ci = ci_score_test[start_idx:end_idx]
-                ci_adj = torch.pow((1 + batch_ci), -best_gamma)
-                dist = dist * ci_adj
-            else:
-                # Shape mismatch or overflow (shouldn't happen if validated)
-                pass
+             if test_uid2idx is not None:
+                 # UID-based alignment
+                 batch_indices = []
+                 for b in range(batch_pred_emb.size(0)):
+                     global_idx = start_idx + b
+                     item = test_data[global_idx]
+                     uid = item.get('meta', {}).get('uid', -1)
+                     if uid in test_uid2idx:
+                         batch_indices.append(test_uid2idx[uid])
+                     else:
+                         batch_indices.append(0) # Fallback
+
+                 batch_ci = ci_score_test[batch_indices]
+                 ci_adj = torch.pow((1 + batch_ci), -best_gamma)
+                 dist = dist * ci_adj
+             else:
+                 # Positional slicing (Fallback)
+                 end_idx = start_idx + batch_pred_emb.size(0)
+                 if end_idx <= ci_score_test.shape[0]:
+                    batch_ci = ci_score_test[start_idx:end_idx]
+                    ci_adj = torch.pow((1 + batch_ci), -best_gamma)
+                    dist = dist * ci_adj
         
         # Incremental Ranking Saving
         if args.save_results:
