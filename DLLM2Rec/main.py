@@ -240,8 +240,6 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
 
     # model.forward
     prediction = model.forward(states, np.array(len_states),llm_emb) # [num_test,num_item]
-    # Remove padding column (Index 0)
-    prediction = prediction[:, 1:]
     sorted_list = torch.argsort(prediction.detach()).cpu().numpy()
 
     hit_purchase = [0] * len(topk)
@@ -276,7 +274,7 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
     values_str = '\t'.join(['{:.6f}\t{:.6f}'.format(h, n) for h, n in zip(hr_list, ndcg_list)])
     print(values_str)
     print('#' * 120)
-    return prediction, hr_list, ndcg_list, uids
+    return prediction[:, 1:], hr_list, ndcg_list, uids
 
 def calcu_propensity_score(buffer):
     items = list(buffer['next'])
