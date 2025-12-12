@@ -17,7 +17,6 @@ parse.add_argument("--batch_size", type=int, default=16, help="batch size for em
 parse.add_argument("--input_file", type=str, default=None, help="specific input file to process")
 parse.add_argument("--use_embedding_model", action="store_true", help="Use dedicated embedding model (e.g. E5)")
 parse.add_argument("--popularity_file", type=str, default=None, help="Path to popularity count json file")
-parse.add_argument("--popularity_file", type=str, default=None, help="Path to popularity count json file")
 parse.add_argument("--popularity_gamma", type=float, default=0.0, help="Gamma value for popularity adjustment")
 parse.add_argument("--validation_file", type=str, default=None, help="Path to validation result json for gamma tuning")
 args = parse.parse_args()
