@@ -156,7 +156,7 @@ if args.validation_file and pop_rank_origin is not None:
             target_item = d['output'].strip("\"").strip(" ")
             tid = item_dict.get(target_item)
             target_ids.append(tid if tid is not None else -1)
-        target_ids = torch.tensor(target_ids, device=rank_indices.device).unsqueeze(1) # [B, 1]
+        target_ids = torch.tensor(target_ids, device=rank_indices.device) # [B]
         
         # Get rank of target
         # rank_indices is [B, M] where value is ItemID at that rank?
