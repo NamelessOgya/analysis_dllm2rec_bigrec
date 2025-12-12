@@ -20,6 +20,7 @@ parse.add_argument("--popularity_file", type=str, default=None, help="Path to po
 parse.add_argument("--popularity_gamma", type=float, default=0.0, help="Gamma value for popularity adjustment")
 parse.add_argument("--validation_file", type=str, default=None, help="Path to validation result json for gamma tuning")
 args = parse.parse_args()
+print(f"DEBUG: Parsed Arguments: {args}")
 
 path = []
 if args.input_file:
@@ -87,6 +88,7 @@ if args.popularity_file:
         pop_rank_origin = None
 
 # Grid Search Logic
+print(f"DEBUG: Checking Grid Search Conditions: validation_file={args.validation_file}, pop_rank_loaded={pop_rank_origin is not None}")
 if args.validation_file and pop_rank_origin is not None:
     print(f"DEBUG: Starting Grid Search for Popularity Gamma using {args.validation_file}...")
     if not os.path.exists(args.validation_file):
