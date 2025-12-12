@@ -165,12 +165,13 @@ if args.validation_file and pop_rank_origin is not None:
         # But target_ids might have -1.
         
         valid_mask = target_ids != -1
-        valid_targets = target_ids[valid_mask.squeeze()]
+        valid_targets = target_ids[valid_mask.view(-1)]
         if len(valid_targets) == 0: return 0.0
         
         # We need the Rank of the Target Item.
         # rank_indices[b, item_id] = rank
-        ranks = torch.gather(rank_indices[valid_mask.squeeze()], 1, valid_targets.unsqueeze(1))
+        # Use view(-1) to ensure mask is 1D
+        ranks = torch.gather(rank_indices[valid_mask.view(-1)], 1, valid_targets.unsqueeze(1))
         
         # NDCG@20
         # if rank < 20: 1/log2(rank+2)
