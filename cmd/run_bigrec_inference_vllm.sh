@@ -1,4 +1,3 @@
-```bash
 #!/bin/bash
 
 # Exit on error
@@ -316,4 +315,3 @@ if [ -f "./best_gamma.txt" ]; then
 fi
 
 echo "BIGRec inference (vLLM) and evaluation completed."
-```
