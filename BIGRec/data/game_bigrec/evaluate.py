@@ -23,6 +23,8 @@ parse.add_argument("--ci_score_path", type=str, default=None, help="Directory co
 # But user wants grid search.
 parse.add_argument("--manual_gamma", type=float, default=None, help="Manually specify gamma (overrides grid search)")
 args = parse.parse_args()
+# Disable gradients globally for evaluation
+torch.set_grad_enabled(False)
 print(f"DEBUG: Parsed Arguments: {args}")
 
 path = []
