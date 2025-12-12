@@ -64,13 +64,21 @@ if args.popularity_file:
     with open(args.popularity_file, 'r') as f_pop:
         pop_count = json.load(f_pop)
     
-    num_items = len(item_dict)
+    # Create Name -> List[ID] mapping to handle duplicates
+    name2ids = {}
+    for idx, name in enumerate(item_names):
+        if name not in name2ids:
+            name2ids[name] = []
+        name2ids[name].append(idx)
+            
+    num_items = len(item_names) # Use total count, not unique count
     pop_rank_origin = torch.zeros(num_items)
     
     for item_name, count in pop_count.items():
-        if item_name in item_dict:
-            idx = item_dict[item_name]
-            pop_rank_origin[idx] = count
+        if item_name in name2ids:
+            # Apply count to all IDs associated with this name
+            for idx in name2ids[item_name]:
+                pop_rank_origin[idx] = count
     
     if pop_rank_origin.sum() > 0:
             pop_rank_origin = pop_rank_origin / pop_rank_origin.sum()
