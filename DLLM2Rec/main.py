@@ -427,7 +427,7 @@ if __name__ == '__main__':
 
 
     total_step = 0
-    best_ndcg20 = 0
+    best_ndcg20 = -1.0
     best_hr20 = 0
     best_step = 0
     patient = 0
