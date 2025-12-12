@@ -163,6 +163,31 @@ vLLMを使用して推論を高速に実行します。
 #   --resource <path>        補正用リソース (人気度ファイル または CIスコアディレクトリ)
 ```
 
+### 実行例 (Copy & Paste用)
+
+コンソールにそのまま貼り付けて実行できる、最も一般的な設定の例です。
+
+**Gameデータセット (Popularity調整あり):**
+```bash
+./cmd/run_bigrec_inference_vllm.sh \
+    --dataset game_bigrec \
+    --model "Qwen/Qwen2-0.5B" \
+    --checkpoint "best" \
+    --test_data "test_5000.json" \
+    --correction popularity \
+    --gpu 0
+```
+
+**Gameデータセット (CI注入あり - SASRecスコア指定):**
+```bash
+./cmd/run_bigrec_inference_vllm.sh \
+    --dataset game_bigrec \
+    --model "Qwen/Qwen2-0.5B" \
+    --correction ci \
+    --resource "DLLM2Rec/results/game_bigrec/sasrec_no_distillation/2024/alpha_1.0/" \
+    --gpu 0
+```
+
 **使用例:**
 
 **1. 人気度バイアス調整 (Popularity Adjustment)**
