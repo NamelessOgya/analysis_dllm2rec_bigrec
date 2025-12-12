@@ -262,8 +262,8 @@ BIGRecの推論結果（DROS適用済み）をDLLM2Recに蒸留するための�
     ※ 最適なエポックのモデルが自動的に使用されます。
 
     ```bash
-    # 引数: --dataset <name> --alpha <val> --gpu <id>
-    ./cmd/run_sasrec_export_for_bigrec.sh --dataset game_bigrec --alpha 1.0 --gpu 0
+    # 引数: --dataset <name> --alpha <val> --gpu <id> --seed <seed>
+    ./cmd/run_sasrec_export_for_bigrec.sh --dataset game_bigrec --alpha 1.0 --gpu 0 --seed 2024
     ```
     結果は `DLLM2Rec/results/.../` に `train.pt`, `train_uids.pt` 等として保存されます。
 

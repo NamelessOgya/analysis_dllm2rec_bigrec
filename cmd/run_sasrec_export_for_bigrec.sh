@@ -11,6 +11,7 @@ DATASET="game"
 ALPHA="1.0"
 GPU="0"
 EPOCH="200"
+SEED="2024"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -28,6 +29,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --epoch)
       EPOCH="$2"
+      shift 2
+      ;;
+    --seed)
+      SEED="$2"
       shift 2
       ;;
     *)
@@ -51,6 +56,7 @@ python main.py \
     --epoch ${EPOCH} \
     --alpha ${ALPHA} \
     --cuda ${GPU} \
+    --seed ${SEED} \
     --export_train_scores
 
 echo "Export Complete. All .pt files should be in results/${DATASET}/..."
