@@ -45,6 +45,7 @@ def parse_args():
     parser.add_argument('--teacher_model', type=str, default="", help='Name of the teacher model for directory naming')
     parser.add_argument('--seed', type=int, default=2024, help='Random seed for student (and implies teacher seed)')
     parser.add_argument('--teacher_sample', type=str, default="", help='Sample size of teacher model for directory naming')
+    parser.add_argument('--export_train_scores', action='store_true', help='If True, export train scores (train.pt) at the end')
     return parser.parse_args()
 
     
@@ -275,6 +276,89 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
     print(values_str)
     print('#' * 120)
     return prediction[:, 1:], hr_list, ndcg_list, uids
+
+def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256):
+    print("Evaluating Training Data for Export...")
+    states = []
+    len_states = []
+    uids = []
+    
+    # Process train_data (DataFrame) sequentially
+    # train_data has 'seq', 'len_seq', 'next', 'uid'
+    
+    all_preds = []
+    all_uids = []
+    
+    num_rows = len(train_data)
+    num_batches = (num_rows + batch_size - 1) // batch_size
+    
+    # We can iterate directly using index slicing for sequential access
+    import math
+    
+    model.eval() # Ensure eval mode
+    
+    with torch.no_grad():
+        for i in range(num_batches):
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, num_rows)
+            batch = train_data.iloc[start_idx:end_idx]
+            
+            # Extract features
+            # seq is already list of lists in DataFrame (if unpickled correctly?)
+            # Wait, in training loop (line 492) it checks if string and converts.
+            # Let's assume similar logic might be needed if loaded from pickle sometimes?
+            # Creating tensors
+            
+            batch_seq = list(batch['seq'])
+            batch_len = list(batch['len_seq'])
+            batch_uid = list(batch['uid'])
+            
+            # Helper to handle string/list ambiguity if present (copy from train loop logic)
+            import ast
+            if len(batch_seq) > 0 and isinstance(batch_seq[0], str):
+                 batch_seq = [[int(num) for num in ast.literal_eval(s)] for s in batch_seq]
+            
+            # Tensor conversion
+            seq_tensor = torch.LongTensor(batch_seq).to(device)
+            # len_tensor = torch.LongTensor(batch_len).to(device) # SASRec logic checks model name?
+            # Model forward expects numpy array for len_states?
+            # Check myevaluate: "np.array(len_states)" passed to forward
+            # Check main loop: "len_seq = torch.LongTensor(len_seq).to(device)" passed to forward
+            # SASRecModules_ori.py forward takes (log_seqs, item_indices, ...) ??
+            # Wait, line 525: model.forward(seq, len_seq, llm_emb)
+            # In myevaluate (line 242): model.forward(states, np.array(len_states), llm_emb)
+            # Let's verify SASRec vs GRU. User is using SASRec.
+            # main loop uses torch tensor. myevaluate uses numpy?
+            # Let's follow main loop pattern for safety.
+            
+            len_tensor = torch.LongTensor(batch_len).to(device)
+            
+            # LLM Emb
+            if llm_all_emb is not None:
+                llm_dim = llm_all_emb.shape[1]
+                llm_emb = torch.zeros(seq_tensor.size(0), seq_tensor.size(1), llm_dim, dtype=llm_all_emb.dtype, device=device)
+                mask = seq_tensor < llm_all_emb.size(0)
+                llm_emb[mask] = llm_all_emb[seq_tensor[mask]]
+                llm_emb = llm_emb.to(device)
+            else:
+                llm_emb = None
+                
+            # Forward
+            preds = model.forward(seq_tensor, len_tensor, llm_emb) # [B, ItemNum]
+            
+            # Slice padding
+            preds = preds[:, 1:]
+            
+            # Append (keep on CPU to save GPU mem)
+            all_preds.append(preds.cpu())
+            all_uids.extend(batch_uid)
+            
+            if (i+1) % 100 == 0:
+                print(f"Processed {i+1}/{num_batches} batches...")
+
+    # Concatenate
+    full_prediction = torch.cat(all_preds, dim=0)
+    return full_prediction, all_uids
 
 def calcu_propensity_score(buffer):
     items = list(buffer['next'])
@@ -640,13 +724,43 @@ if __name__ == '__main__':
                     # Save best predictions (CI scores)
                     print(f"New best model found! Saving scores to {output_dir}...")
                     torch.save(val_prediction, os.path.join(output_dir, "val.pt"))
+                    torch.save(val_prediction, os.path.join(output_dir, "val.pt"))
                     torch.save(prediction, os.path.join(output_dir, "test.pt"))
                     torch.save(torch.LongTensor(val_uids), os.path.join(output_dir, "val_uids.pt"))
                     torch.save(torch.LongTensor(test_uids), os.path.join(output_dir, "test_uids.pt"))
+                    # Save model state dict for reloading
+                    torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
                 else:
                     patient += 1 
                 print(f'patient={patient}, BEST STEP:{best_step}, BEST NDCG@20:{best_ndcg20}, BEST HR@20:{best_hr20}, test cost:{e_test-s_test}s')
+                
+                if patient >= 50: # Default patience usually 10-20? User said early stopping not working in BIGRec, here it works?
+                    print("Early stopping triggered (Patient hit limit).")
+                    break
+        
+        if patient >= 50:
+             break
 
+    # TRAINING FINISHED
+    # Export train scores if requested
+    if args.export_train_scores:
+        print("="*30)
+        print("Starting Export of Training Scores (for Distillation)...")
+        
+        # Load best model state
+        best_model_path = os.path.join(output_dir, "best_model.pth")
+        if os.path.exists(best_model_path):
+            print(f"Loading best model from {best_model_path}...")
+            model.load_state_dict(torch.load(best_model_path))
+        else:
+            print("WARNING: Best model not found. Using current model state (might be suboptimal).")
+        
+        train_pred, train_uids = myevaluate_train(model, train_data, device, llm_all_emb, batch_size=args.batch_size)
+        
+        print(f"Saving train scores to {output_dir}...")
+        torch.save(train_pred, os.path.join(output_dir, "train.pt"))
+        torch.save(torch.LongTensor(train_uids), os.path.join(output_dir, "train_uids.pt"))
+        print("Export Complete.")
                 if patient >= 10:
                     e = time.time()
                     cost = (e - s)/60

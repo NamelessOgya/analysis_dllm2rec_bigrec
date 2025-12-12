@@ -219,14 +219,20 @@ elif args.validation_file:
                 if isinstance(val_uids, torch.Tensor): val_uids = val_uids.tolist()
                 val_uid2idx = {uid: i for i, uid in enumerate(val_uids)}
                 
+                
                 aligned_indices = []
+                missing_uids_count = 0
                 for item in valid_data:
                     uid = item.get('meta', {}).get('uid', -1)
                     if uid in val_uid2idx:
                         aligned_indices.append(val_uid2idx[uid])
                     else:
-                        print(f"WARNING: UID {uid} not found in val results, using index 0 (score might be wrong)")
+                        missing_uids_count += 1
                         aligned_indices.append(0)
+                        
+                if missing_uids_count > 0:
+                     raise ValueError(f"CRITICAL ERROR: {missing_uids_count} UIDs in Validation Data were NOT found in CI Scores (val_uids.pt). Data misalignment detected.")
+                
                 ci_norm_val = ci_norm_val[aligned_indices]
 
             # Check shapes
@@ -271,9 +277,9 @@ if args.ci_score_path:
         # Since we sliced Val, likely need to slice Test.
         # Let's check against item_dict length or similar?
         # (Use updated DLLM2Rec/main.py to correct this at source)
-        # if ci_score_test.shape[1] > len(item_dict):
-        #      print(f"DEBUG: Slicing ci_score_test from {ci_score_test.shape} to match item_num {len(item_dict)} (Dropping padding column)")
-        #      ci_score_test = ci_score_test[:, 1:]
+        if ci_score_test.shape[1] > len(item_dict):
+             print(f"DEBUG: Slicing ci_score_test from {ci_score_test.shape} to match item_num {len(item_dict)} (Dropping padding column)")
+             ci_score_test = ci_score_test[:, 1:]
         
         # Normalize Test Scores
         ci_min = torch.min(ci_score_test, dim=1, keepdim=True)[0]
@@ -417,28 +423,73 @@ for p in path:
         # CI Score depends on Batch Slice
         # Apply CI Adjustment if enabled
         if ci_score_test is not None:
-             if test_uid2idx is not None:
+             # Determine which CI scores to use based on filename
+             # If filename contains 'val' or 'valid', use Validation CI
+             is_validation = 'val' in p or 'valid' in p
+             is_train = 'train' in p
+             
+             if is_validation:
+                  current_ci_score = ci_norm_val
+                  current_uid2idx = val_uid2idx
+             elif is_train:
+                  if ci_score_train is not None and train_uid2idx is not None:
+                      current_ci_score = ci_score_train
+                      current_uid2idx = train_uid2idx
+                      # print(f"DEBUG: Using Train CI scores for {p}")
+                  else:
+                      print(f"WARNING: Train CI requested for {p} but train.pt/uids not loaded.")
+                      current_ci_score = None
+                      current_uid2idx = None
+                      print(f"WARNING: Train CI requested for {p} but train.pt/uids not loaded.")
+                      current_ci_score = None
+                      current_uid2idx = None
+             else:
+                  # Use Test CI
+                  current_ci_score = ci_score_test
+                  current_uid2idx = test_uid2idx
+
+             if current_uid2idx is not None:
+                 # Strict Alignment Check
+                 # Check if all UIDs in this dataset part exist in current_uid2idx
+                 # Since we might be streaming or batching, checking ALL now effectively.
+                 # test_data is loaded in memory (line 320).
+                 
+                 # Optimization: Check set difference once
+                 dataset_uids = set()
+                 for item in test_data:
+                     dataset_uids.add(item.get('meta', {}).get('uid', -1))
+                 
+                 # Remove -1 if it exists (assuming -1 means error in data generation, but we check valid UIDs here)
+                 if -1 in dataset_uids:
+                      # If strict, maybe complain about -1 too? User asked for match validation.
+                      # Let's ignore -1 for alignment check unless they are ALL -1.
+                      pass
+
+                 ci_uids_set = set(current_uid2idx.keys())
+                 missing_uids = dataset_uids - ci_uids_set
+                 # Filter out -1 from missing if desired, or treat as error
+                 missing_valid_uids = [u for u in missing_uids if u != -1]
+                 
+                 if len(missing_valid_uids) > 0:
+                      raise ValueError(f"CRITICAL ERROR: Found {len(missing_valid_uids)} UIDs in {p} that are MISSING from the loaded CI scores ({'Train' if is_train else ('Validation' if is_validation else 'Test')}). Examples: {missing_valid_uids[:5]}")
+
                  # UID-based alignment
                  batch_indices = []
                  for b in range(batch_pred_emb.size(0)):
                      global_idx = start_idx + b
                      item = test_data[global_idx]
                      uid = item.get('meta', {}).get('uid', -1)
-                     if uid in test_uid2idx:
-                         batch_indices.append(test_uid2idx[uid])
+                     if uid in current_uid2idx:
+                         batch_indices.append(current_uid2idx[uid])
                      else:
                          batch_indices.append(0) # Fallback
 
-                 batch_ci = ci_score_test[batch_indices]
+                 batch_ci = current_ci_score[batch_indices]
                  ci_adj = torch.pow((1 + batch_ci), -best_gamma)
                  dist = dist * ci_adj
              else:
-                 # Positional slicing (Fallback)
-                 end_idx = start_idx + batch_pred_emb.size(0)
-                 if end_idx <= ci_score_test.shape[0]:
-                    batch_ci = ci_score_test[start_idx:end_idx]
-                    ci_adj = torch.pow((1 + batch_ci), -best_gamma)
-                    dist = dist * ci_adj
+                 # Positional slicing (Fallback) - Only valid if we trust order, which we don't for shuffled data
+                 pass
         
         # Incremental Ranking Saving
         if args.save_results:

@@ -252,3 +252,35 @@ SASRecモデルを学習させます。CI注入用のスコア生成にも使用
 ```bash
 python test/test_preprocess.py
 ```
+
+### 11. BIGRec蒸留 (Distillation) の準備
+
+BIGRecの推論結果（DROS適用済み）をDLLM2Recに蒸留するための準備手順です。
+
+1.  **SASRec学習 & スコア全出力**
+    学習データを含む全てのデータセット分割 (`train`, `val`, `test`) に対する予測スコアとUIDを生成します。
+    ※ 最適なエポックのモデルが自動的に使用されます。
+
+    ```bash
+    # 引数: --dataset <name> --alpha <val> --gpu <id>
+    ./cmd/run_sasrec_export_for_bigrec.sh --dataset game_bigrec --alpha 1.0 --gpu 0
+    ```
+    結果は `DLLM2Rec/results/.../` に `train.pt`, `train_uids.pt` 等として保存されます。
+
+2.  **BIGRec推論 (Trainデータ)**
+    学習データに対して推論を実行し、蒸留用のランク/スコアファイルを生成します。
+    ファイル名に `train` が含まれる場合、自動的に `train.pt` が読み込まれ、**厳密なUID整合性チェック**が行われます。
+
+    ```bash
+    # --test_data に学習データを指定
+    ./cmd/run_bigrec_inference_vllm.sh \
+        --dataset game_bigrec \
+        --test_data "train.json" \
+        --correction ci \
+        --resource "DLLM2Rec/results/game_bigrec/..." \
+        --limit -1 \
+        --gpu 0
+    ```
+    
+3.  **DLLM2Recへの蒸留**
+    出力された `train_rank.txt`, `train_score.txt` を用いてDLLM2Recの蒸留学習を行います（詳細は `pipeline_config.yaml` 等を参照）。
