@@ -343,11 +343,11 @@ for p in path:
     
     # CI Alignment Check
     ci_adjustment_tensor = None
-    if ci_score_test is not None and args.ci_gamma > 0:
+    if ci_score_test is not None and best_gamma > 0:
         if ci_score_test.shape[0] != predict_embeddings.shape[0]:
              print(f"WARNING: CI Score shape {ci_score_test.shape} does not match test data shape {predict_embeddings.shape}. Skipping CI injection.")
         else:
-             print(f"DEBUG: Applying CI injection with gamma={args.ci_gamma}")
+             print(f"DEBUG: Applying CI injection with gamma={best_gamma}")
              # Pre-calculate factor if memory allows, or chunk it?
              # (1 + ci)^(-gamma)
              # ci_score_test is [N, M]
