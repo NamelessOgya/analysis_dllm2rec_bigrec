@@ -240,6 +240,8 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
 
     # model.forward
     prediction = model.forward(states, np.array(len_states),llm_emb) # [num_test,num_item]
+    # Remove padding column (Index 0)
+    prediction = prediction[:, 1:]
     sorted_list = torch.argsort(prediction.detach()).cpu().numpy()
 
     hit_purchase = [0] * len(topk)

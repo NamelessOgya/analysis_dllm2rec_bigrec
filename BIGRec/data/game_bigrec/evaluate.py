@@ -201,9 +201,10 @@ elif args.validation_file:
             # SASRec output includes padding index 0, so shape is [B, M+1] (e.g. 17409).
             # BIGRec embeddings are [M] (e.g. 17408).
             # We need to drop index 0.
-            if ci_val.shape[1] > valid_dist.shape[1]:
-                 print(f"DEBUG: Slicing ci_val from {ci_val.shape} to match dist {valid_dist.shape} (Dropping padding column)")
-                 ci_val = ci_val[:, 1:]
+            # (Use updated DLLM2Rec/main.py to correct this at source)
+            # if ci_val.shape[1] > valid_dist.shape[1]:
+            #     print(f"DEBUG: Slicing ci_val from {ci_val.shape} to match dist {valid_dist.shape} (Dropping padding column)")
+            #     ci_val = ci_val[:, 1:]
             
             # Normalize CI scores (Min-Max)
             ci_min = torch.min(ci_val, dim=1, keepdim=True)[0]
@@ -267,18 +268,12 @@ if args.ci_score_path:
         if torch.cuda.is_available():
             ci_score_test = ci_score_test.cuda()
         
-        # SASRec output includes padding, slice if needed
-        # We don't have dist shape handy yet, but we know it should likely be sliced if it matches item_num+1
-        # Let's assume consistent behavior with val
-        if ci_score_test.shape[1] == 17409 and 17409 > 1: # Basic heuristic or check against movie_embedding later?
-             # Actually, we can check against loaded movie_embedding shape if valid
-             pass
-
         # Since we sliced Val, likely need to slice Test.
         # Let's check against item_dict length or similar?
-        if ci_score_test.shape[1] > len(item_dict):
-             print(f"DEBUG: Slicing ci_score_test from {ci_score_test.shape} to match item_num {len(item_dict)} (Dropping padding column)")
-             ci_score_test = ci_score_test[:, 1:]
+        # (Use updated DLLM2Rec/main.py to correct this at source)
+        # if ci_score_test.shape[1] > len(item_dict):
+        #      print(f"DEBUG: Slicing ci_score_test from {ci_score_test.shape} to match item_num {len(item_dict)} (Dropping padding column)")
+        #      ci_score_test = ci_score_test[:, 1:]
         
         # Normalize Test Scores
         ci_min = torch.min(ci_score_test, dim=1, keepdim=True)[0]
