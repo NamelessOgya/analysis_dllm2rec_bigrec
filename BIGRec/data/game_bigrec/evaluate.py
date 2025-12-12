@@ -191,7 +191,7 @@ if args.validation_file and pop_rank_origin is not None:
         # Note: In log space? No dist is Euclidean.
         # Optimization: (1+pop)^(-gamma) can be precomputed but gamma changes.
         adj = torch.pow((1 + pop_rank_tensor), -gamma)
-        adjusted_dist = dist * adj # Broadcasting
+        adjusted_dist = valid_dist * adj # Broadcasting
         
         # Get Ranks
         # We only need the Rank of the Target Item
