@@ -226,6 +226,7 @@ elif args.validation_file:
                 
                 aligned_indices = []
                 missing_uids_count = 0
+                aligned_indices = []
                 for item in valid_data:
                     uid = item.get('meta', {}).get('uid', -1)
                     if uid in val_uid2idx:
@@ -241,8 +242,7 @@ elif args.validation_file:
 
             # Check shapes
             if valid_dist.shape != ci_norm_val.shape:
-                print(f"ERROR: Shape mismatch for CI tuning. Dist: {valid_dist.shape}, CI: {ci_norm_val.shape}")
-                print("WARNING: Skipping CI tuning due to shape mismatch.")
+                raise ValueError(f"CRITICAL ERROR: Shape mismatch for CI tuning. Dist: {valid_dist.shape}, CI: {ci_norm_val.shape}. Ensure val.pt matches valid.json.")
             else:
                 search_gammas_ci = [x/10.0 for x in range(0, 50)] + [i for i in range(5, 20)] # 0.0-5.0 step 0.1, 5-20 step 1
                 
@@ -433,18 +433,10 @@ for p in path:
     
     # CI Alignment Check
     ci_adjustment_tensor = None
+    # CI Alignment Check: Logic moved inside batch loop to handle Train/Val/Test specifics correctly.
     if ci_score_test is not None and best_gamma > 0:
-        if ci_score_test.shape[0] != predict_embeddings.shape[0]:
-             print(f"WARNING: CI Score shape {ci_score_test.shape} does not match test data shape {predict_embeddings.shape}. Skipping CI injection.")
-        else:
-             print(f"DEBUG: Applying CI injection with gamma={best_gamma}")
-             # Pre-calculate factor if memory allows, or chunk it?
-             # (1 + ci)^(-gamma)
-             # ci_score_test is [N, M]
-             # We can process it in batches inside the loop to save memory if N*M is huge.
-             # But here we already have it in memory.
-             # Let's pass it to the loop.
-             pass
+        pass 
+
 
     print(f"DEBUG: Starting batched evaluation (Batch Size: {eval_batch_size})...")
     
@@ -460,33 +452,37 @@ for p in path:
              dist = dist * adjustment_tensor
         
         # Apply CI Adjustment if enabled (Mutually Exclusive handled before, but safe check)
-        # CI Score depends on Batch Slice
-        # Apply CI Adjustment if enabled
-        if ci_score_test is not None:
+        if args.ci_score_path:
              # Determine which CI scores to use based on filename
              # If filename contains 'val' or 'valid', use Validation CI
-             is_validation = 'val' in p or 'valid' in p
-             is_train = 'train' in p
+             is_validation = 'val' in p.lower() or 'valid' in p.lower()
+             is_train = 'train' in p.lower()
              
+             print(f"DEBUG: Checking file classification for '{p}': is_train={is_train}, is_validation={is_validation}")
+
              if is_validation:
                   current_ci_score = ci_norm_val
                   current_uid2idx = val_uid2idx
+                  print(f"DEBUG: Using Validation CI for {p}")
              elif is_train:
                   if ci_score_train is not None and train_uid2idx is not None:
                       current_ci_score = ci_score_train
                       current_uid2idx = train_uid2idx
-                      # print(f"DEBUG: Using Train CI scores for {p}")
+                      print(f"DEBUG: Using Train CI for {p}")
                   else:
-                      print(f"WARNING: Train CI requested for {p} but train.pt/uids not loaded.")
-                      current_ci_score = None
-                      current_uid2idx = None
-                      print(f"WARNING: Train CI requested for {p} but train.pt/uids not loaded.")
+                      print(f"WARNING: Train CI requested for {p} (is_train=True) but train.pt/uids not loaded (ci_score_train={ci_score_train is not None}, train_uid2idx={train_uid2idx is not None}).")
                       current_ci_score = None
                       current_uid2idx = None
              else:
                   # Use Test CI
-                  current_ci_score = ci_score_test
-                  current_uid2idx = test_uid2idx
+                  if ci_score_test is not None:
+                      current_ci_score = ci_score_test
+                      current_uid2idx = test_uid2idx
+                      print(f"DEBUG: Using Test CI for {p}")
+                  else:
+                      print(f"WARNING: Test CI requested (default) for {p} but test.pt not loaded.")
+                      current_ci_score = None
+                      current_uid2idx = None
 
              if current_uid2idx is not None:
                  # Strict Alignment Check
