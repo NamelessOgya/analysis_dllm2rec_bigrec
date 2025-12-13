@@ -264,6 +264,39 @@ if args.validation_file or args.manual_gamma is not None:
         f_g.write(str(best_gamma))
     print("DEBUG: Saved best_gamma.txt")
 
+# SASRec CI Train Scores Loading (Added to fix NameError)
+ci_score_train = None
+train_uid2idx = None
+if args.ci_score_path:
+    train_pt_path = os.path.join(args.ci_score_path, "train.pt")
+    if os.path.exists(train_pt_path):
+        print(f"DEBUG: Loading Train CI scores from {train_pt_path}")
+        ci_score_train = torch.load(train_pt_path)
+        if torch.cuda.is_available():
+            ci_score_train = ci_score_train.cuda()
+        
+        # Slicing logic using len(item_names) as requested
+        if ci_score_train.shape[1] > len(item_names):
+             print(f"DEBUG: Slicing ci_score_train from {ci_score_train.shape} to match item_num {len(item_names)} (Dropping padding column)")
+             ci_score_train = ci_score_train[:, 1:]
+        
+        # Normalize Train Scores
+        ci_min = torch.min(ci_score_train, dim=1, keepdim=True)[0]
+        ci_max = torch.max(ci_score_train, dim=1, keepdim=True)[0]
+        ci_score_train = (ci_score_train - ci_min) / (ci_max - ci_min + 1e-9)
+        
+        # Load Train UIDs if available
+        train_uids_path = os.path.join(args.ci_score_path, "train_uids.pt")
+        if os.path.exists(train_uids_path):
+             print(f"DEBUG: Loading Train UIDs from {train_uids_path} for alignment...")
+             train_uids = torch.load(train_uids_path)
+             if isinstance(train_uids, torch.Tensor): train_uids = train_uids.tolist()
+             train_uid2idx = {uid: i for i, uid in enumerate(train_uids)}
+    else:
+        # It's okay if train.pt doesn't exist if we aren't processing training data, 
+        # but if we are, it will fail later. Initialized to None is correct.
+        pass
+
 # SASRec CI Test Scores Loading
 ci_score_test = None
 if args.ci_score_path:
