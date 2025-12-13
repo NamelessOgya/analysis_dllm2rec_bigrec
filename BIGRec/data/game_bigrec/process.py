@@ -8,8 +8,8 @@ import csv
 import pickle
 
 # Set random seed
-random.seed(42)
-np.random.seed(42)
+random.seed(0)
+np.random.seed(0)
 
 def load_data():
     # Read from ../game_v2 directory to reuse downloads
@@ -36,7 +36,10 @@ def filter_data(metadata, reviews):
     
     item2id = dict()
     count = 0
-    for item in items:
+    item2id = dict()
+    count = 0
+    # Sort items to ensure deterministic ID assignment
+    for item in sorted(list(items)):
         item2id[item] = count
         count += 1
     

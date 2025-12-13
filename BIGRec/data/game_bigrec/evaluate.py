@@ -81,6 +81,7 @@ if args.popularity_file:
         if name not in name2ids:
             name2ids[name] = []
         name2ids[name].append(idx)
+
             
     num_items = len(item_names) # Use total count, not unique count
     pop_rank_origin = torch.zeros(num_items)
@@ -101,6 +102,7 @@ if args.popularity_file:
     if torch.cuda.is_available():
             pop_rank_origin = pop_rank_origin.cuda()
 
+# Helper to calc NDCG@20 only for speed
 # Helper to calc NDCG@20 only for speed
 def calc_ndcg_20(rank_indices, data, item_dict):
     # Target IDs
@@ -176,6 +178,8 @@ elif args.validation_file:
         for gamma in search_space:
             adj = torch.pow((1 + pop_rank_tensor), -gamma)
             adjusted_dist = valid_dist * adj # Broadcasting
+            
+            rank_indices = adjusted_dist.argsort(dim=-1).argsort(dim=-1)
             
             rank_indices = adjusted_dist.argsort(dim=-1).argsort(dim=-1)
             
@@ -277,8 +281,9 @@ if args.ci_score_path:
         
         # Slicing logic using len(item_names) as requested
         if ci_score_train.shape[1] > len(item_names):
-             print(f"DEBUG: Slicing ci_score_train from {ci_score_train.shape} to match item_num {len(item_names)} (Dropping padding column)")
+             # print(f"DEBUG: Slicing ci_score_train from {ci_score_train.shape} to match item_num {len(item_names)} (Dropping padding column)")
              ci_score_train = ci_score_train[:, 1:]
+
         
         # Normalize Train Scores
         ci_min = torch.min(ci_score_train, dim=1, keepdim=True)[0]
@@ -311,8 +316,9 @@ if args.ci_score_path:
         # Let's check against item_dict length or similar?
         # (Use updated DLLM2Rec/main.py to correct this at source)
         if ci_score_test.shape[1] > len(item_names):
-             print(f"DEBUG: Slicing ci_score_test from {ci_score_test.shape} to match item_num {len(item_names)} (Dropping padding column)")
+             # print(f"DEBUG: Slicing ci_score_test from {ci_score_test.shape} to match item_num {len(item_names)} (Dropping padding column)")
              ci_score_test = ci_score_test[:, 1:]
+
 
         
         # Normalize Test Scores
@@ -520,9 +526,10 @@ for p in path:
 
                  batch_ci = current_ci_score[batch_indices]
                  ci_adj = torch.pow((1 + batch_ci), -best_gamma)
-                 print(f"DEBUG: dist.shape={dist.shape}, ci_adj.shape={ci_adj.shape}")
+                 # print(f"DEBUG: dist.shape={dist.shape}, ci_adj.shape={ci_adj.shape}")
                  dist = dist * ci_adj
              else:
+
                  # Positional slicing (Fallback) - Only valid if we trust order, which we don't for shuffled data
                  pass
         
@@ -574,6 +581,8 @@ for p in path:
         current_batch_size = batch_rank.size(0)
         for b in range(current_batch_size):
             global_idx = start_idx + b
+        for b in range(current_batch_size):
+            global_idx = start_idx + b
             target_item = test_data[global_idx]['output'].strip("\"").strip(" ")
             target_id = item_dict.get(target_item)
             
@@ -581,6 +590,7 @@ for p in path:
                 continue
                 
             minID = batch_rank_cpu[b][target_id].item()
+
             
             for topk in topk_list:
                 if minID < topk:
