@@ -66,7 +66,8 @@ class GRU(nn.Module):
             num_layers=gru_layers,
             batch_first=True
         )
-        self.s_fc = nn.Linear(self.hidden_size, self.item_num)
+        self.s_fc = nn.Linear(self.hidden_size, self.item_num + 1)
+
 
         self.fc_llm = nn.Linear(llm_input_dim, 64)
 
@@ -118,7 +119,8 @@ class Caser(nn.Module):
         # Fully Connected Layer
         self.num_filters_total = self.num_filters * len(self.filter_sizes)
         final_dim = self.hidden_size + self.num_filters_total
-        self.s_fc = nn.Linear(final_dim, item_num)
+        self.s_fc = nn.Linear(final_dim, item_num + 1)
+
 
         # dropout
         self.dropout = nn.Dropout(self.dropout_rate)
@@ -176,7 +178,8 @@ class SASRec(nn.Module):
         self.ln_3 = nn.LayerNorm(hidden_size)
         self.mh_attn = MultiHeadAttention(hidden_size, hidden_size, num_heads, dropout)
         self.feed_forward = PositionwiseFeedForward(hidden_size, hidden_size, dropout)
-        self.s_fc = nn.Linear(hidden_size, item_num)
+        self.s_fc = nn.Linear(hidden_size, item_num + 1)
+
            
         self.fc_llm = nn.Linear(llm_input_dim, 64)
         self.relu = nn.ReLU()
