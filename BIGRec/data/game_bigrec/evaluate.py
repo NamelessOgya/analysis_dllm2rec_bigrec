@@ -486,6 +486,7 @@ for p in path:
 
                  batch_ci = current_ci_score[batch_indices]
                  ci_adj = torch.pow((1 + batch_ci), -best_gamma)
+                 print(f"DEBUG: dist.shape={dist.shape}, ci_adj.shape={ci_adj.shape}")
                  dist = dist * ci_adj
              else:
                  # Positional slicing (Fallback) - Only valid if we trust order, which we don't for shuffled data
