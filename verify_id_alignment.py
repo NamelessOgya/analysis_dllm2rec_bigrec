@@ -95,5 +95,40 @@ def verify():
     except Exception as e:
         print(f"Error verifies rank file: {e}")
 
+def inspect_ci_scores():
+    # Looking for .pt files in results
+    print("\n--- Inspecting CI Scores (.pt files) ---")
+    base_dir = "DLLM2Rec/results"
+    
+    # Walk and find .pt files
+    for root, dirs, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(".pt") and ("train" in file or "val" in file or "test" in file):
+                 full_path = os.path.join(root, file)
+                 try:
+                     # Use torch if available in environment (but we removed it earlier).
+                     # We need torch to load pt.
+                     # If I cannot load torch, I cannot inspect dimensions easily.
+                     # I will try to re-import torch inside this scope if it works, else skip.
+                     import torch
+                     data = torch.load(full_path, map_location='cpu')
+                     if isinstance(data, torch.Tensor):
+                         print(f"File: {full_path}")
+                         print(f"  Shape: {data.shape}")
+                         if len(data.shape) == 2:
+                             print(f"  Rows: {data.shape[0]}, Items: {data.shape[1]}")
+                             if data.shape[1] == 2048:
+                                 print("  !! FOUND THE 2048 DIMENSION SUSPECT !!")
+                     else:
+                         print(f"File: {full_path} (Type: {type(data)}) - Not a Tensor")
+                         
+                 except ImportError:
+                     print("Torch not found, cannot inspect .pt files.")
+                     return
+                 except Exception as e:
+                     print(f"Error loading {full_path}: {e}")
+
 if __name__ == "__main__":
     verify()
+    inspect_ci_scores()
+
