@@ -259,13 +259,13 @@ BIGRecの推論結果（DROS適用済み）をDLLM2Recに蒸留するための�
 
 1.  **SASRec学習 & スコア全出力**
     学習データを含む全てのデータセット分割 (`train`, `val`, `test`) に対する予測スコアとUIDを生成します。
-    ※ 最適なエポックのモデルが自動的に使用されます。
+    `run_sasrec_baseline.sh` はデフォルトで `train.pt` 等も出力するように拡張されました。
 
     ```bash
-    # 引数: --dataset <name> --alpha <val> --gpu <id> --seed <seed>
-    ./cmd/run_sasrec_export_for_bigrec.sh --dataset game_bigrec --alpha 1.0 --gpu 0 --seed 2024
+    # 引数: <dataset> <gpu_id> <epoch> <seed> <alpha>
+    ./cmd/run_sasrec_baseline.sh game_bigrec 0 200 2024 1.0
     ```
-    結果は `DLLM2Rec/results/.../` に `train.pt`, `train_uids.pt` 等として保存されます。
+    結果は `DLLM2Rec/results/.../sasrec_no_distillation/...` に正しく保存されます。
 
 2.  **BIGRec推論 (Trainデータ)**
     学習データに対して推論を実行し、蒸留用のランク/スコアファイルを生成します。
