@@ -283,4 +283,24 @@ BIGRecの推論結果（DROS適用済み）をDLLM2Recに蒸留するための�
     ```
     
 3.  **DLLM2Recへの蒸留**
-    出力された `train_rank.txt`, `train_score.txt` を用いてDLLM2Recの蒸留学習を行います（詳細は `pipeline_config.yaml` 等を参照）。
+    生成された `train_epoch_best_rank.txt` 等を用いて、DLLM2Recの蒸留学習を実行します。
+
+    ```bash
+    # 引数: <dataset> <model> <gpu> <ed_weight> <lambda> <teacher_model> <teacher_seed> <teacher_sample> <teacher_epoch>
+    # 注意: lambdaは蒸留の重みです。ed_weightは距離関数の重みです。
+    
+    ./cmd/run_dllm2rec_train.sh \
+        game_bigrec \
+        SASRec \
+        0 \
+        0.3 \
+        0.7 \
+        "Qwen/Qwen2-0.5B" \
+        0 \
+        1024 \
+        "best"
+    ```
+    
+    このスクリプトは自動的に以下のパスにある教師データを探索して使用します:
+    `BIGRec/results/game_bigrec/Qwen_Qwen2-0.5B/0_1024/train_epoch_best_rank.txt`
+
