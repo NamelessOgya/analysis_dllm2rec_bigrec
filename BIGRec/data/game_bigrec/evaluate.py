@@ -277,9 +277,10 @@ if args.ci_score_path:
         # Since we sliced Val, likely need to slice Test.
         # Let's check against item_dict length or similar?
         # (Use updated DLLM2Rec/main.py to correct this at source)
-        if ci_score_test.shape[1] > len(item_dict):
-             print(f"DEBUG: Slicing ci_score_test from {ci_score_test.shape} to match item_num {len(item_dict)} (Dropping padding column)")
+        if ci_score_test.shape[1] > len(item_names):
+             print(f"DEBUG: Slicing ci_score_test from {ci_score_test.shape} to match item_num {len(item_names)} (Dropping padding column)")
              ci_score_test = ci_score_test[:, 1:]
+
         
         # Normalize Test Scores
         ci_min = torch.min(ci_score_test, dim=1, keepdim=True)[0]
