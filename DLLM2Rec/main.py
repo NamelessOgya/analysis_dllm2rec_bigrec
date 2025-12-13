@@ -278,7 +278,9 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
     values_str = '\t'.join(['{:.6f}\t{:.6f}'.format(h, n) for h, n in zip(hr_list, ndcg_list)])
     print(values_str)
     print('#' * 120)
-    return prediction[:, 1:], hr_list, ndcg_list, uids
+    print(values_str)
+    print('#' * 120)
+    return prediction[:, :-1], hr_list, ndcg_list, uids
 
 def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256):
     print("Evaluating Training Data for Export...")
@@ -339,6 +341,9 @@ def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256
             # LLM Emb
             if llm_all_emb is not None:
                 llm_dim = llm_all_emb.shape[1]
+                # The mask should be based on seq_tensor values being less than llm_all_emb.size(0)
+                # The original code used `seq < llm_all_emb.size(0)` which is correct.
+                # The `llm_emb` tensor should be initialized with zeros.
                 llm_emb = torch.zeros(seq_tensor.size(0), seq_tensor.size(1), llm_dim, dtype=llm_all_emb.dtype, device=device)
                 mask = seq_tensor < llm_all_emb.size(0)
                 llm_emb[mask] = llm_all_emb[seq_tensor[mask]]
@@ -349,8 +354,8 @@ def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256
             # Forward
             preds = model.forward(seq_tensor, len_tensor, llm_emb) # [B, ItemNum]
             
-            # Slice padding
-            preds = preds[:, 1:]
+            # Slice padding (last column)
+            preds = preds[:, :-1]
             
             # Append (convert to half to save memory: 4GB -> 2GB approx)
             all_preds.append(preds.half().cpu())
@@ -372,10 +377,14 @@ def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256
 def calcu_propensity_score(buffer):
     items = list(buffer['next'])
     freq = Counter(items)
-    for i in range(item_num):
+    # 0-based items: 0 to item_num-1. 
+    # Propensity should cover valid items.
+    # We can cover padding too or just items.
+    # Model output is item_num+1. So PS should be item_num+1.
+    for i in range(item_num + 1):
         if i not in freq.keys():
             freq[i] = 0
-    pop = [freq[i] for i in range(item_num)]
+    pop = [freq[i] for i in range(item_num + 1)]
     pop = np.array(pop)
     ps = pop + 1
     ps = ps / np.sum(ps)
@@ -595,10 +604,21 @@ if __name__ == '__main__':
             # negtive item sampling 
             real_batch_size = args.batch_size
             num_negtive_items = args.num_negtive_items
-            zeros_tensor = torch.zeros((real_batch_size, item_num+1), device=device)
+            # item_num + 2 to handle padding token (item_num) without crash?
+            # Items 0..item_num-1. Padding = item_num.
+            # Output size item_num+1 (Indices 0..item_num).
+            # zeros_tensor size item_num+1 is sufficient if we don't access item_num+1.
+            # But earlier code used item_num+2 for safety. Let's stick with item_num+2 masking.
+            zeros_tensor = torch.zeros((real_batch_size, item_num + 2), device=device)
+            # scatter padding (index item_num) and targets
             zeros_tensor[torch.arange(real_batch_size).unsqueeze(1).repeat(1, 10), seq] = 1
             zeros_tensor[torch.arange(real_batch_size), target] = 1
-            zeros_tensor = zeros_tensor[:,:-1]
+            
+            # Mask index item_num (Padding) to prevent sampling it
+            # We want to sample negative items from 0..item_num-1
+            zeros_tensor[:, item_num] = 1 
+            # Slice to valid range [0, item_num] (size item_num+1)
+            zeros_tensor = zeros_tensor[:, :item_num+1]
             neg_tensor = 1 - zeros_tensor
             batch_neg = torch.multinomial(
                 neg_tensor, num_negtive_items, replacement=True
@@ -646,7 +666,10 @@ if __name__ == '__main__':
 
             if args.lam != 0:
                 candidate = all_candidate[sample] # [1024,k]
-                candidate = candidate[:,:args.candidate_topk]   
+                candidate = candidate[:,:args.candidate_topk]
+                # FIX: BIGRec IDs are 0-based. SASRec items 0-based.
+                # No shift needed!
+                # candidate = candidate   
                 # weight_rank
                 _lambda = 1
                 _K = args.candidate_topk

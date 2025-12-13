@@ -165,15 +165,15 @@ def save_dllm2rec_data(train, valid, test, item_num):
             target_id = row[4]
             uid = row[10]
             
-            # 1-based indexing for DLLM2Rec
-            seq = [x + 1 for x in history_ids] 
-            next_item = target_id + 1
+            # 0-based indexing for DLLM2Rec (Aligning with BIGRec)
+            # Items 0..item_num-1. Padding = item_num
+            seq = [x for x in history_ids] 
+            next_item = target_id
             len_seq = len(seq)
             
             # Pad sequence to length 10
-            # SASRec expects fixed length sequences in checking batch
-            # utility.py pads at the end
-            pad_token = item_num + 1
+            # SASRec uses item_num as padding index (if configured correctly)
+            pad_token = item_num 
             if len_seq < 10:
                 seq = seq + [pad_token] * (10 - len_seq)
             else:
