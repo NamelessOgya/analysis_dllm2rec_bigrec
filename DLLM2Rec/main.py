@@ -349,8 +349,8 @@ def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256
             # Slice padding
             preds = preds[:, 1:]
             
-            # Append (keep on CPU to save GPU mem)
-            all_preds.append(preds.cpu())
+            # Append (convert to half to save memory: 4GB -> 2GB approx)
+            all_preds.append(preds.half().cpu())
             all_uids.extend(batch_uid)
             
             if (i+1) % 100 == 0:
@@ -358,6 +358,12 @@ def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256
 
     # Concatenate
     full_prediction = torch.cat(all_preds, dim=0)
+    # Convert back to float32 if needed for saving? torch.save supports half.
+    # evaluate.py loads it. We should check if evaluate.py handles half.
+    # evaluate.py: ci_train = torch.load(...) -> (ci_train - min)/(max-min). 
+    # Half has smaller range, could overflow if raw logits are huge?
+    # Logits from SASRec usually reasonable range.
+    # Let's keep it half for saving too.
     return full_prediction, all_uids
 
 def calcu_propensity_score(buffer):
