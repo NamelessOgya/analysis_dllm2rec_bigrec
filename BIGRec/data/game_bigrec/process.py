@@ -203,8 +203,9 @@ def save_dllm2rec_data(train, valid, test, item_num):
     
     # Save statistics
     # seq_size is window size (10)
-    # item_num is max_id + 1 (since 0 is padding)
-    statis = pd.DataFrame([{'seq_size': 10, 'item_num': item_num + 1}])
+    # item_num is max_id + 1 if 0-based? No, item_num is COUNT of items.
+    # IDs 0..item_num-1.
+    statis = pd.DataFrame([{'seq_size': 10, 'item_num': item_num}])
     statis.to_pickle('./data_statis.df')
     
     print("Saved DLLM2Rec data to .")
