@@ -304,3 +304,22 @@ BIGRecの推論結果（DROS適用済み）をDLLM2Recに蒸留するための�
     このスクリプトは自動的に以下のパスにある教師データを探索して使用します:
     `BIGRec/results/game_bigrec/Qwen_Qwen2-0.5B/0_1024/train_epoch_best_rank.txt`
 
+### 12. Active Learning 学習データの作成
+
+Active Learning (DROSの推論結果などを利用したサンプリング) に基づく BIGRec 学習データを作成します。
+
+```bash
+# 引数: <dataset> <method> <ratio> <seed> <batch_size>
+# method: random, pop_inverse, clustering, loss, entropy, error_rank
+# ratio: 0.0 ~ 1.0 (サンプリング率)
+
+# 例: Loss-Maximization (Hard Sample Mining) で 50% サンプリング
+./cmd/create_active_learning_data.sh game_bigrec loss 0.5
+
+# 例: Semantic Diversity (Clustering) で 30% サンプリング
+./cmd/create_active_learning_data.sh game_bigrec clustering 0.3
+```
+
+作成されたデータは `BIGRec/data/game_bigrec/train_{method}_{ratio}.json` に保存されます。
+これを BIGRec 学習スクリプトの `--train_data_path` 引数に渡すことで、Active Learning を用いた学習が可能になります。
+※ DROSベースの手法 (loss, entropy, error_rank) を使用する場合は、事前に `run_sasrec_baseline.sh` (alpha=1.0 推奨) を実行してスコアを生成しておく必要があります。
