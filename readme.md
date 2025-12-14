@@ -333,5 +333,33 @@ Active Learning (DROSの推論結果などを利用したサンプリング) に
     *   その他: 空文字
 *   `ratio{al_ratio}`: 1.0 以外の場合のみ付与されます。
 
-これを BIGRec 学習スクリプトの `--train_data_path` 引数に渡すことで、Active Learning を用いた学習が可能になります。
+これらを `run_bigrec_train.sh` に渡すことで、Active Learning を用いた学習が可能になります。
 ※ DROSベースの手法を使用する場合、`dros_source` で指定したディレクトリに `train.pt` と `train_uids.pt` が存在する必要があります。
+
+#### Active Learning 学習の実行
+
+作成したデータを BIGRec の学習に使用する例です。
+ここで重要なのは、**`SAMPLE` 引数には `-1` (全件使用) を指定すること** です。
+(すでにサンプリング済みデータであるため、再サンプリングを防ぐためです)
+
+```bash
+# 引数: <dataset> ... <train_data_file> <model_suffix>
+# 第10引数: 学習データファイル名 (パスではなくファイル名)
+# 第11引数: 出力ディレクトリのSuffix (上書き防止用)
+
+# 例: Lossサンプリングデータ (30000件) で学習
+./cmd/run_bigrec_train.sh \
+    game_bigrec \
+    0 \
+    0 \
+    -1 \
+    128 \
+    128 \
+    "Qwen/Qwen2-0.5B" \
+    50 \
+    "" \
+    "train_loss_30000_seed42_alpha_1.0.json" \
+    "_loss_30k"
+
+# 出力先: BIGRec/model/game_bigrec/.../0_-1_loss_30k/
+```

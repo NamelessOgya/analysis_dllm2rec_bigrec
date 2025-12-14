@@ -302,6 +302,8 @@ def main():
     final_selected_uids = selected_uids_al
     
     print(f"Selected {len(final_selected_uids)} UIDs.")
+    if len(final_selected_uids) == 0:
+        raise ValueError("No UIDs were selected! Check if DROS scores/UIDs align with input data.")
     
     # 4. Save Output
     output_data = []
