@@ -31,8 +31,8 @@ cd "$BIGREC_DIR"
 
 # Run training
 # Run training
-SECONDS=0
-# Note: Adjust arguments as needed based on README and requirements
+# Start timing
+START_TIME=$(python3 -c 'import time; print(time.time())')
 
 # Calculate number of GPUs
 IFS=',' read -ra GPU_ARRAY <<< "$GPU_ID"
@@ -82,13 +82,16 @@ else
         $( [ -n "$PROMPT_FILE" ] && echo "--prompt_file $PROMPT_FILE" )
 fi
 
-duration=$SECONDS
-duration_min=$(($duration / 60))
-echo "Finetuning time: $duration_min minutes"
+# End timing
+END_TIME=$(python3 -c 'import time; print(time.time())')
+ELAPSED=$(python3 -c "print($END_TIME - $START_TIME)")
+ELAPSED_MIN=$(python3 -c "print($ELAPSED / 60)")
+
+echo "Finetuning time: $ELAPSED seconds ($ELAPSED_MIN minutes)"
 
 # Save execution time to JSON
 python -c "import json; import os; 
-data = {'finetuning_time_minutes': $duration_min}; 
+data = {'finetuning_time_minutes': $ELAPSED_MIN, 'finetuning_time_seconds': $ELAPSED}; 
 with open(os.path.join('$OUTPUT_DIR', 'execution_time.json'), 'w') as f: json.dump(data, f, indent=4)"
 
 echo "BIGRec training completed."

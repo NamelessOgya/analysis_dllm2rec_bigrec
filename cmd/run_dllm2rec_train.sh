@@ -49,7 +49,9 @@ DLLM2REC_DIR="DLLM2Rec"
 cd "$DLLM2REC_DIR"
 
 # Run training
-SECONDS=0
+# Start timing
+START_TIME=$(python3 -c 'import time; print(time.time())')
+
 python main.py \
     --data "$DATASET" \
     --model_name "$MODEL_NAME" \
@@ -62,9 +64,12 @@ python main.py \
     --teacher_sample "$BIGREC_SAMPLE" \
     $EXTRA_ARGS
 
-duration=$SECONDS
-duration_min=$(($duration / 60))
-echo "Distillation process time: $duration_min minutes"
+# End timing
+END_TIME=$(python3 -c 'import time; print(time.time())')
+ELAPSED=$(python3 -c "print($END_TIME - $START_TIME)")
+ELAPSED_MIN=$(python3 -c "print($ELAPSED / 60)")
+
+echo "Distillation process time: $ELAPSED seconds ($ELAPSED_MIN minutes)"
 
 # Create output directory if not exists (DLLM2Rec doesn't seem to have a standard output dir structure in this script)
 OUTPUT_DIR="output/$DATASET"
@@ -72,7 +77,7 @@ mkdir -p "$OUTPUT_DIR"
 
 # Save execution time to JSON
 python -c "import json; import os; 
-data = {'distillation_time_minutes': $duration_min}; 
+data = {'distillation_time_minutes': $ELAPSED_MIN, 'distillation_time_seconds': $ELAPSED}; 
 with open(os.path.join('$OUTPUT_DIR', 'execution_time.json'), 'w') as f: json.dump(data, f, indent=4)"
 
 echo "DLLM2Rec training completed."

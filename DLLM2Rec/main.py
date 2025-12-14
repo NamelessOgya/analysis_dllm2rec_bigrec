@@ -580,6 +580,8 @@ if __name__ == '__main__':
     for i in range(args.epoch):
         s_epoch = time.time()
         for j in range(num_batches):
+            if j % 10 == 0:
+                print(f"DEBUG: Processing batch {j}/{num_batches}")
             batch = train_data.sample(n=args.batch_size)
             sample = batch.index
             batch = batch.to_dict()

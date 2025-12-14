@@ -206,6 +206,7 @@ if [ ! -f "$EMBEDDING_FILE" ]; then
 fi
 
 # Run inference with vLLM
+# Run inference with vLLM
 if [ "$SKIP_INFERENCE" = "true" ]; then
     echo "Skipping inference step."
 else
@@ -214,6 +215,9 @@ else
     echo "Using $NUM_GPUS GPUs: $GPU_ID"
     echo "Processing limit: $LIMIT"
     
+    # Start timing for Inference
+    START_TIME_INF=$(python3 -c 'import time; print(time.time())')
+
     CUDA_VISIBLE_DEVICES=$GPU_ID python BIGRec/inference_vllm.py \
         --base_model "$BASE_MODEL" \
         --lora_weights "$LORA_WEIGHTS" \
@@ -225,6 +229,25 @@ else
         --output_suffix "$EPOCH_SUFFIX" \
         $( [ -n "$PROMPT_FILE" ] && echo "--prompt_file $PROMPT_FILE" ) \
         $EXTRA_ARGS
+
+    # End timing for Inference
+    END_TIME_INF=$(python3 -c 'import time; print(time.time())')
+    ELAPSED_INF=$(python3 -c "print($END_TIME_INF - $START_TIME_INF)")
+    ELAPSED_INF_MIN=$(python3 -c "print($ELAPSED_INF / 60)")
+    echo "Data generation time: $ELAPSED_INF seconds ($ELAPSED_INF_MIN minutes)"
+
+    # Save/Update execution time to JSON
+    python -c "import json; import os; 
+path = os.path.join('$RESULT_DIR', 'execution_time.json');
+data = {};
+if os.path.exists(path):
+    try:
+        with open(path, 'r') as f: data = json.load(f)
+    except: pass;
+key = 'data_generation_time_minutes_' + '$TEST_DATA';
+data[key] = $ELAPSED_INF_MIN;
+data[key.replace('_minutes_', '_seconds_')] = $ELAPSED_INF;
+with open(path, 'w') as f: json.dump(data, f, indent=4)"
 fi
 
 echo "Inference completed. Running evaluation..."
@@ -285,6 +308,10 @@ fi
 
 
 # Run evaluation
+# Run evaluation
+# Start timing for Evaluation
+START_TIME_EVAL=$(python3 -c 'import time; print(time.time())')
+
 if [ "$TEST_DATA" = "all" ] || [ "$TEST_DATA" = "valid_test" ]; then
     # Directory mode
     CUDA_VISIBLE_DEVICES=$GPU_ID python "BIGRec/data/$DATASET/evaluate.py" \
@@ -305,6 +332,25 @@ else
         --input_file "$RESULT_JSON_PATH" \
         $EXTRA_EMBED_ARGS $EVAL_ARGS
 fi
+
+# End timing for Evaluation
+END_TIME_EVAL=$(python3 -c 'import time; print(time.time())')
+ELAPSED_EVAL=$(python3 -c "print($END_TIME_EVAL - $START_TIME_EVAL)")
+ELAPSED_EVAL_MIN=$(python3 -c "print($ELAPSED_EVAL / 60)")
+echo "Evaluation time: $ELAPSED_EVAL seconds ($ELAPSED_EVAL_MIN minutes)"
+
+# Save/Update execution time to JSON
+python -c "import json; import os; 
+path = os.path.join('$RESULT_DIR', 'execution_time.json');
+data = {};
+if os.path.exists(path):
+    try:
+        with open(path, 'r') as f: data = json.load(f)
+    except: pass;
+key = 'evaluation_time_minutes_' + '$TEST_DATA';
+data[key] = $ELAPSED_EVAL_MIN;
+data[key.replace('_minutes_', '_seconds_')] = $ELAPSED_EVAL;
+with open(path, 'w') as f: json.dump(data, f, indent=4)"
 
 # Saving metrics (backwards compat)
 if [ -f "./${DATASET}.json" ]; then
