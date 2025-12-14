@@ -766,14 +766,16 @@ if __name__ == '__main__':
                     patient += 1 
                 print(f'patient={patient}, BEST STEP:{best_step}, BEST NDCG@20:{best_ndcg20}, BEST HR@20:{best_hr20}, test cost:{e_test-s_test}s')
                 
-                if patient >= 50: # Default patience usually 10-20? User said early stopping not working in BIGRec, here it works?
-                    print("Early stopping triggered (Patient hit limit).")
-                    break
-        
-        if patient >= 50:
-             break
-
+        if patient >= 10: # Default patience usually 10-20? User said early stopping not working in BIGRec, here it works?
+            e = time.time()
+            cost = (e - s)/60
+            print(f'=============early stop=============')
+            print(f'cost {cost} min')
+            break
+            
     # TRAINING FINISHED
+    save_metrics(args, best_hr_list_result, best_ndcg_list_result, best_val_hr_list_result, best_val_ndcg_list_result)
+
     # Export train scores if requested
     if args.export_train_scores:
         print("="*30)
@@ -793,10 +795,8 @@ if __name__ == '__main__':
         torch.save(train_pred, os.path.join(output_dir, "train.pt"))
         torch.save(torch.LongTensor(train_uids), os.path.join(output_dir, "train_uids.pt"))
         print("Export Complete.")
-        if patient >= 10:
-            e = time.time()
-            cost = (e - s)/60
-            print(f'=============early stop=============')
-            print(f'cost {cost} min')
-            save_metrics(args, best_hr_list_result, best_ndcg_list_result, best_val_hr_list_result, best_val_ndcg_list_result)
-            exit(0)
+
+    e = time.time()
+    cost = (e - s)/60
+    print(f'cost {cost} min')
+    exit(0)
