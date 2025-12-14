@@ -4,16 +4,19 @@
 set -e
 
 # Arguments
+# Arguments
 DATASET=${1:-game_bigrec}
 METHOD=${2:-loss} # random, pop_inverse, clustering, loss, entropy, error_rank
-RATIO=${3:-0.5}
-SEED=${4:-42}
-BATCH_SIZE=${5:-1024}
+SAMPLE_NUM=${3:-10000}
+AL_RATIO=${4:-1.0}
+SEED=${5:-42}
+BATCH_SIZE=${6:-1024}
+DROS_SOURCE=${7:-""}
 
 # Optional Paths (can be overridden by environment variables or arguments if we extend this script, 
 # but for now we follow the project structure)
 
-echo "Running Active Learning Sampling for $DATASET with method=$METHOD, ratio=$RATIO, seed=$SEED..."
+echo "Running Active Learning Sampling for $DATASET with method=$METHOD, sample_num=$SAMPLE_NUM, al_ratio=$AL_RATIO, seed=$SEED..."
 
 # Define paths
 BASE_DIR="$(pwd)"
@@ -25,12 +28,29 @@ INPUT_DF="$DLLM2Rec_DIR/data/$DATASET/train_data.df"
 
 # DROS Outputs (Default location for SASRec / alpha=1.0 / seed=2024 / epoch=200)
 # Adjust these defaults if your DROS training settings differ!
-DROS_DIR="$DLLM2Rec_DIR/results/$DATASET/sasrec_no_distillation/2024/alpha_1.0"
+if [ -z "$DROS_SOURCE" ]; then
+    DROS_DIR="$DLLM2Rec_DIR/results/$DATASET/sasrec_no_distillation/2024/alpha_1.0"
+else
+    DROS_DIR="$DROS_SOURCE"
+fi
+
 DROS_SCORE="$DROS_DIR/train.pt"
 DROS_UID="$DROS_DIR/train_uids.pt"
 ITEM_EMB="$DLLM2Rec_DIR/tocf/$DATASET/all_embeddings.pt"
 
-OUTPUT_JSON="$BIGREC_DIR/data/$DATASET/train_${METHOD}_${RATIO}.json"
+# Construct Filename
+MODEL_SUFFIX=""
+if [[ "$METHOD" == "loss" || "$METHOD" == "entropy" || "$METHOD" == "error_rank" ]]; then
+    # Extract alpha or directory name as model identifier
+    MODEL_SUFFIX="_$(basename "$DROS_DIR")"
+fi
+
+RATIO_SUFFIX=""
+if [ "$AL_RATIO" != "1.0" ]; then
+    RATIO_SUFFIX="_ratio${AL_RATIO}"
+fi
+
+OUTPUT_JSON="$BIGREC_DIR/data/$DATASET/train_${METHOD}_${SAMPLE_NUM}${RATIO_SUFFIX}_seed${SEED}${MODEL_SUFFIX}.json"
 
 # Check if data exists
 if [ ! -f "$INPUT_JSON" ]; then
@@ -43,7 +63,8 @@ CMD="python3 $BIGREC_DIR/data/game_bigrec/sample_data.py \
     --input_json $INPUT_JSON \
     --input_df $INPUT_DF \
     --method $METHOD \
-    --ratio $RATIO \
+    --sample_num $SAMPLE_NUM \
+    --al_ratio $AL_RATIO \
     --output_json $OUTPUT_JSON \
     --seed $SEED \
     --batch_size $BATCH_SIZE"

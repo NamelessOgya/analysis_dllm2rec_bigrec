@@ -76,7 +76,7 @@ class TestSampleData(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir)
 
-    def run_script(self, method, ratio, output_name):
+    def run_script(self, method, sample_num, output_name, al_ratio=1.0):
         output_path = os.path.join(self.test_dir, output_name)
         cmd = [
             'python3', self.script_path,
@@ -86,7 +86,8 @@ class TestSampleData(unittest.TestCase):
             '--dros_uid', self.uid_path,
             '--item_emb', self.emb_path,
             '--method', method,
-            '--ratio', str(ratio),
+            '--sample_num', str(sample_num),
+            '--al_ratio', str(al_ratio),
             '--output_json', output_path,
             '--batch_size', '10'
         ]
@@ -98,16 +99,18 @@ class TestSampleData(unittest.TestCase):
         return output_path
 
     def test_random(self):
-        output_path = self.run_script('random', 0.5, 'out_random.json')
+        sample_num = 50
+        output_path = self.run_script('random', sample_num, 'out_random.json')
         with open(output_path, 'r') as f:
             data = json.load(f)
-        self.assertEqual(len(data), int(self.N * 0.5))
+        self.assertEqual(len(data), sample_num)
 
     def test_loss(self):
         # We expect high loss items to be picked.
         # UID 1 has high loss (wrong prediction). UID 0 has low loss.
-        # Ratio 0.1 -> Top 10 items. UID 1 should be there.
-        output_path = self.run_script('loss', 0.1, 'out_loss.json')
+        # Sample 10 items. UID 1 should be there.
+        sample_num = 10
+        output_path = self.run_script('loss', sample_num, 'out_loss.json')
         with open(output_path, 'r') as f:
             data = json.load(f)
         uids = [d['meta']['uid'] for d in data]
@@ -115,13 +118,15 @@ class TestSampleData(unittest.TestCase):
         self.assertNotIn(0, uids)
 
     def test_clustering(self):
-        output_path = self.run_script('clustering', 0.5, 'out_cluster.json')
+        sample_num = 50
+        output_path = self.run_script('clustering', sample_num, 'out_cluster.json')
         with open(output_path, 'r') as f:
             data = json.load(f)
-        self.assertEqual(len(data), int(self.N * 0.5))
+        self.assertEqual(len(data), sample_num)
 
     def test_pop_inverse(self):
-        output_path = self.run_script('pop_inverse', 0.2, 'out_pop.json')
+        sample_num = 20
+        output_path = self.run_script('pop_inverse', sample_num, 'out_pop.json')
         with open(output_path, 'r') as f:
             data = json.load(f)
         # Should contain rare items. Item 1 is rare? No, item "remainder" are uniform rare.
@@ -132,6 +137,19 @@ class TestSampleData(unittest.TestCase):
         pick_targets = df[df['uid'].isin(uids)]['next'].tolist()
         # Item 0 count should be low/zero
         self.assertTrue(pick_targets.count(0) < len(pick_targets) * 0.5)
+
+    def test_mixed(self):
+        # UID 1 has high loss (wrong). UID 0 has low loss.
+        # We want 50% AL, 50% Random.
+        # Sample=10, AL=5. UID 1 must be in top 5.
+        # Total 10 items.
+        sample_num = 10
+        output_path = self.run_script('loss', sample_num, 'out_mixed.json', al_ratio=0.5)
+        with open(output_path, 'r') as f:
+            data = json.load(f)
+        self.assertEqual(len(data), 10)
+        uids = [d['meta']['uid'] for d in data]
+        self.assertIn(1, uids) # 1 is High Loss (Hard), should be picked by AL part.
 
 if __name__ == '__main__':
     unittest.main()

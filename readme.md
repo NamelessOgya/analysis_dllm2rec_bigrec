@@ -309,17 +309,29 @@ BIGRecの推論結果（DROS適用済み）をDLLM2Recに蒸留するための�
 Active Learning (DROSの推論結果などを利用したサンプリング) に基づく BIGRec 学習データを作成します。
 
 ```bash
-# 引数: <dataset> <method> <ratio> <seed> <batch_size>
+```bash
+```bash
+# 引数: <dataset> <method> <sample_num> <al_ratio> <seed> <batch_size> <dros_source>
 # method: random, pop_inverse, clustering, loss, entropy, error_rank
-# ratio: 0.0 ~ 1.0 (サンプリング率)
+# sample_num: サンプリング数 (例: 10000)
+# al_ratio: AL選択の割合 (0.0~1.0, デフォルト1.0)
+# dros_source: DROSスコア (train.pt) があるディレクトリパス (デフォルトは sasrec_no_distillation/2024/alpha_1.0)
 
-# 例: Loss-Maximization (Hard Sample Mining) で 50% サンプリング
-./cmd/create_active_learning_data.sh game_bigrec loss 0.5
+# 例: Loss-Based Sampling (30000件, 混合なし) - デフォルトDROSパス使用
+./cmd/create_active_learning_data.sh game_bigrec loss 30000
 
-# 例: Semantic Diversity (Clustering) で 30% サンプリング
-./cmd/create_active_learning_data.sh game_bigrec clustering 0.3
+# 例: 特定のSASRec学習結果を用いてサンプリングする場合
+./cmd/create_active_learning_data.sh game_bigrec error_rank 10000 1.0 42 1024 "DLLM2Rec/results/game_bigrec/sasrec_no_distillation/2025/alpha_0.5/"
 ```
 
-作成されたデータは `BIGRec/data/game_bigrec/train_{method}_{ratio}.json` に保存されます。
+作成されたデータは以下の形式で `BIGRec/data/game_bigrec/` に保存されます。
+
+`train_{method}_{sample_num}_ratio{al_ratio}_seed{seed}_{model_suffix}.json`
+
+*   `model_suffix`:
+    *   DROSベースの手法の場合: DROSソースパスのディレクトリ名 (例: `_alpha_1.0`)
+    *   その他: 空文字
+*   `ratio{al_ratio}`: 1.0 以外の場合のみ付与されます。
+
 これを BIGRec 学習スクリプトの `--train_data_path` 引数に渡すことで、Active Learning を用いた学習が可能になります。
-※ DROSベースの手法 (loss, entropy, error_rank) を使用する場合は、事前に `run_sasrec_baseline.sh` (alpha=1.0 推奨) を実行してスコアを生成しておく必要があります。
+※ DROSベースの手法を使用する場合、`dros_source` で指定したディレクトリに `train.pt` と `train_uids.pt` が存在する必要があります。

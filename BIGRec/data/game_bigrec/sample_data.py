@@ -25,7 +25,8 @@ def parse_args():
     parser.add_argument('--method', type=str, required=True, 
                         choices=['random', 'pop_inverse', 'diversity', 'loss', 'entropy', 'error_rank', 'clustering'],
                         help='Sampling method')
-    parser.add_argument('--ratio', type=float, required=True, help='Sampling ratio (0.0 - 1.0)')
+    parser.add_argument('--sample_num', type=int, required=True, help='Number of samples to select')
+    parser.add_argument('--al_ratio', type=float, default=1.0, help='Ratio of samples to select via Active Learning (0.0 - 1.0). Remainder is random.')
     parser.add_argument('--output_json', type=str, required=True, help='Output JSON path')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--batch_size', type=int, default=1024, help='Batch size for score calculation')
@@ -203,6 +204,7 @@ def main():
 
     elif args.method == 'random':
         # Just assign random score
+        # Even for mixed strategy, if method is random, al_ratio of random + random remainder = random.
         for u in common_uids:
             scores[u] = random.random()
 
@@ -218,101 +220,92 @@ def main():
         raise ValueError(f"Unknown method: {args.method}")
 
     # 3. Sampling
-    target_size = int(len(common_uids) * args.ratio)
-    print(f"Sampling {target_size} records from {len(common_uids)} candidates...")
+    total_target_size = min(len(common_uids), args.sample_num)
     
-    selected_uids = []
+    # Calculate Split
+    n_al = int(total_target_size * args.al_ratio)
+    n_random = total_target_size - n_al
     
-    if args.method == 'diversity':
-        # Greedy for item coverage
-        # Prioritize items not yet covered
-        random.shuffle(user_items) # Shuffle for randomness in ties
-        
-        covered_items = set()
-        candidates_new_item = []
-        candidates_redundant = []
-        
-        for u, item in user_items:
-            if item not in covered_items:
-                candidates_new_item.append(u)
-                covered_items.add(item)
-            else:
-                candidates_redundant.append(u)
-        
-        # Take all new coverage items first
-        selected_uids = candidates_new_item[:target_size]
-        
-        # Fill remaining
-        if len(selected_uids) < target_size:
-            needed = target_size - len(selected_uids)
-            selected_uids.extend(candidates_redundant[:needed])
+    print(f"Sampling {total_target_size} records total.")
+    print(f"  - Active Learning ({args.method}): {n_al}")
+    print(f"  - Random Fill: {n_random}")
+    
+    selected_uids_al = []
+    
+    # --- Active Learning Part ---
+    if n_al > 0:
+        if args.method == 'diversity':
+            # Greedy for item coverage
+            # Prioritize items not yet covered
+            random.shuffle(user_items) # Shuffle for randomness in ties
             
-    elif args.method == 'clustering':
-        # Stratified sampling per cluster
-        # scores[u] = cluster_id
-        cluster_uids = {}
-        for u, cid in scores.items():
-            if cid not in cluster_uids:
-                cluster_uids[cid] = []
-            cluster_uids[cid].append(u)
+            covered_items = set()
+            candidates_new_item = []
+            candidates_redundant = []
             
-        # Distribute target quota across clusters
-        # Attempt Uniform distribution? Or Proportional to cluster size?
-        # Proposal: "Semantic Diversity". Usually implies ensuring small clusters are represented.
-        # Let's aim for Uniform allocation first, then cap at cluster size?
-        # Say target_size=1000, clusters=50. Aim 20 per cluster.
-        # If cluster has < 20, take all, redistribute remainder.
+            for u, item in user_items:
+                if item not in covered_items:
+                    candidates_new_item.append(u)
+                    covered_items.add(item)
+                else:
+                    candidates_redundant.append(u)
+            
+            # Take all new coverage items first
+            selected_uids_al = candidates_new_item[:n_al]
+            
+            # Fill remaining for AL part
+            if len(selected_uids_al) < n_al:
+                needed = n_al - len(selected_uids_al)
+                selected_uids_al.extend(candidates_redundant[:needed])
+                
+        elif args.method == 'clustering':
+            # scores[u] = cluster_id
+            cluster_uids = {}
+            for u, cid in scores.items():
+                if cid not in cluster_uids:
+                    cluster_uids[cid] = []
+                cluster_uids[cid].append(u)
+            
+            all_uids_list = []
+            for cid in cluster_uids:
+                random.shuffle(cluster_uids[cid])
+            
+            keys = list(cluster_uids.keys())
+            random.shuffle(keys)
+            
+            while len(selected_uids_al) < n_al and len(keys) > 0:
+                for k in list(keys): # Iterate copy
+                    if not cluster_uids[k]:
+                        keys.remove(k)
+                        continue
+                    selected_uids_al.append(cluster_uids[k].pop())
+                    if len(selected_uids_al) >= n_al:
+                        break
+                        
+        else:
+            # Score based (Top-K)
+            sorted_uids = sorted(scores.keys(), key=lambda k: scores[k], reverse=True)
+            selected_uids_al = sorted_uids[:n_al]
+    
+    # --- Random Fill Part ---
+    selected_set = set(selected_uids_al)
+    candidate_random = [u for u in common_uids if u not in selected_set]
+    
+    if n_random > 0:
+        if len(candidate_random) < n_random:
+             print("Warning: Not enough candidates for random fill! Taking all.")
+             selected_random = candidate_random
+        else:
+            selected_random = random.sample(candidate_random, n_random)
+        selected_uids_al.extend(selected_random)
         
-        # Let's try Proportional for stability, or simple "Round Robin" to maximize min-count?
-        # Let's go with simple Proportional + Random Shuffle within cluster (Standard Stratified) 
-        # BUT the proposal says "Semantic Diversity... distinct from id coverage".
-        # Let's do Proportional to maintain distribution shape but smaller.
-        
-        # Actually, user wants "Active Learning" -> "Improve generalization".
-        # Let's stick to Proportional as safe baseline for clustering.
-        # Wait, if we just proportional sample, it's very close to Random.
-        # "Semantic Diversity" implies we force cover all clusters.
-        # Let's ensure AT LEAST 1 item from each cluster if possible, then fill proportionally?
-        
-        all_uids_list = []
-        for cid in cluster_uids:
-            random.shuffle(cluster_uids[cid])
-            all_uids_list.extend(cluster_uids[cid])
-        
-        # Just shuffle all? No, that's random.
-        # Let's do: Pick 1 from each cluster (Round Robin) until full?
-        # This maximizes "balance" between clusters.
-        
-        keys = list(cluster_uids.keys())
-        random.shuffle(keys)
-        
-        while len(selected_uids) < target_size and len(keys) > 0:
-            for k in list(keys): # Iterate copy
-                if not cluster_uids[k]:
-                    keys.remove(k)
-                    continue
-                selected_uids.append(cluster_uids[k].pop())
-                if len(selected_uids) >= target_size:
-                    break
-                    
-    else:
-        # Score based (Top-K)
-        # Loss/Entropy/Error/Pop: Higher is better candidate?
-        # Loss: High loss -> Hard. Keep. (Top-K)
-        # Entropy: High entropy -> Uncertain. Keep. (Top-K)
-        # Rank: High rank (bad position) -> Error. Keep. (Top-K)
-        # Pop-Inverse: High (1/freq) -> Rare. Keep. (Top-K)
-        # Random: High (random) -> Random. (Top-K)
-        
-        # Sort by score descending
-        sorted_uids = sorted(scores.keys(), key=lambda k: scores[k], reverse=True)
-        selected_uids = sorted_uids[:target_size]
-        
-    print(f"Selected {len(selected_uids)} UIDs.")
+    final_selected_uids = selected_uids_al
+    
+    print(f"Selected {len(final_selected_uids)} UIDs.")
     
     # 4. Save Output
     output_data = []
-    for u in selected_uids:
+    for u in final_selected_uids:
         output_data.append(uid2entry[u])
         
     print(f"Saving to {args.output_json}...")
