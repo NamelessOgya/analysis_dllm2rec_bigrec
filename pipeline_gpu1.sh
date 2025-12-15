@@ -2,6 +2,7 @@
 # Auto-generated pipeline script. Skips steps if output exists.
 set -e
 
+echo "----------------------------------------------------------------"
 echo 'Starting experiment for game_bigrec seed=1 alpha=0.5 strategy=random ...'
 
 # --- Step 1: SASRec ---
@@ -44,6 +45,7 @@ else
     OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/dllm2rec_final/random_1000_0.5_seed_1_alpha_0.5/ed_0.3_lam_0.7 RANKING_PATH=experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_1_alpha_0.5/train_epoch_best_rank.txt CONFIDENCE_PATH=experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_1_alpha_0.5/train_epoch_best_score.txt EMBEDDING_PATH=BIGRec/data/game_bigrec/model_embeddings/google_gemma-2B-it.pt ./cmd/run_dllm2rec_train.sh game_bigrec SASRec 1 0.3 0.7
 fi
 
+echo "----------------------------------------------------------------"
 echo 'Starting experiment for game_bigrec seed=3 alpha=0.5 strategy=random ...'
 
 # --- Step 1: SASRec ---
@@ -86,6 +88,7 @@ else
     OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/dllm2rec_final/random_1000_0.5_seed_3_alpha_0.5/ed_0.3_lam_0.7 RANKING_PATH=experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_3_alpha_0.5/train_epoch_best_rank.txt CONFIDENCE_PATH=experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_3_alpha_0.5/train_epoch_best_score.txt EMBEDDING_PATH=BIGRec/data/game_bigrec/model_embeddings/google_gemma-2B-it.pt ./cmd/run_dllm2rec_train.sh game_bigrec SASRec 1 0.3 0.7
 fi
 
+echo "----------------------------------------------------------------"
 echo 'Starting experiment for game_bigrec seed=1 alpha=0.5 strategy=random ...'
 
 # --- Step 1: SASRec ---
@@ -128,6 +131,7 @@ else
     OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/dllm2rec_final/random_100_0.5_seed_1_alpha_0.5/ed_0.3_lam_0.7 RANKING_PATH=experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_100_0.5_seed_1_alpha_0.5/train_epoch_best_rank.txt CONFIDENCE_PATH=experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_100_0.5_seed_1_alpha_0.5/train_epoch_best_score.txt EMBEDDING_PATH=BIGRec/data/game_bigrec/model_embeddings/google_gemma-2B-it.pt ./cmd/run_dllm2rec_train.sh game_bigrec SASRec 1 0.3 0.7
 fi
 
+echo "----------------------------------------------------------------"
 echo 'Starting experiment for game_bigrec seed=3 alpha=0.5 strategy=random ...'
 
 # --- Step 1: SASRec ---

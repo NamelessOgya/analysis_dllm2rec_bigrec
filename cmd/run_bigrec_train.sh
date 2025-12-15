@@ -42,8 +42,16 @@ cd "$BIGREC_DIR"
 START_TIME=$(python3 -c 'import time; print(time.time())')
 
 # Resolve Training Data Path
-if [[ "$TRAIN_DATA_FILE" == /* ]]; then
+# Resolve Training Data Path
+# Check if path is absolute, starts with ./, or starts with experiments/
+if [[ "$TRAIN_DATA_FILE" == /* ]] || [[ "$TRAIN_DATA_FILE" == ./* ]] || [[ "$TRAIN_DATA_FILE" == experiments/* ]]; then
     FULL_TRAIN_PATH="$TRAIN_DATA_FILE"
+    # If path is relative (starts with experiments/ or ./), we need to make sure it resolves correctly from BIGRec dir.
+    # The script cd's into BIGRec dir (line 37).
+    # If the path is relative to repo root (like experiments/...), then from BIGRec dir it should be ../experiments/...
+    if [[ "$TRAIN_DATA_FILE" == experiments/* ]]; then
+         FULL_TRAIN_PATH="../$TRAIN_DATA_FILE"
+    fi
 else
     FULL_TRAIN_PATH="./data/$DATASET/$TRAIN_DATA_FILE"
 fi

@@ -52,6 +52,7 @@ def generate_bash_pipeline(csv_path):
                 
                 exp_root = f"experiments/{dataset}"
 
+                f.write(f"echo \"----------------------------------------------------------------\"\n")
                 f.write(f"echo 'Starting experiment for {dataset} seed={seed} alpha={alpha} strategy={strategy} ...'\n")
 
                 # === Step 1: SASRec ===
