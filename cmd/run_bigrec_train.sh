@@ -31,10 +31,15 @@ if [ -z "$OUTPUT_DIR" ]; then
     exit 1
 fi
 
-# Ensure output directory exists
+# Ensure output directory exists (from root)
 mkdir -p "$OUTPUT_DIR"
 
 cd "$BIGREC_DIR"
+
+# Adjust OUTPUT_DIR for internal usage (relative to BIGRec now)
+if [[ "$OUTPUT_DIR" == experiments/* ]]; then
+    OUTPUT_DIR="../$OUTPUT_DIR"
+fi
 
 # Run training
 # Run training
