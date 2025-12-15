@@ -26,7 +26,10 @@ SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
 # Define paths
 BIGREC_DIR="BIGRec"
 # Use absolute path for output directory to avoid issues when changing directory
-OUTPUT_DIR="$(pwd)/BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}${MODEL_SUFFIX}"
+if [ -z "$OUTPUT_DIR" ]; then
+    echo "Error: OUTPUT_DIR environment variable is required."
+    exit 1
+fi
 
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
@@ -38,6 +41,13 @@ cd "$BIGREC_DIR"
 # Start timing
 START_TIME=$(python3 -c 'import time; print(time.time())')
 
+# Resolve Training Data Path
+if [[ "$TRAIN_DATA_FILE" == /* ]]; then
+    FULL_TRAIN_PATH="$TRAIN_DATA_FILE"
+else
+    FULL_TRAIN_PATH="./data/$DATASET/$TRAIN_DATA_FILE"
+fi
+
 # Calculate number of GPUs
 IFS=',' read -ra GPU_ARRAY <<< "$GPU_ID"
 NUM_GPUS=${#GPU_ARRAY[@]}
@@ -46,7 +56,7 @@ if [ "$NUM_GPUS" -gt 1 ]; then
     echo "Detected $NUM_GPUS GPUs. Using torchrun for distributed training."
     CUDA_VISIBLE_DEVICES=$GPU_ID torchrun --nproc_per_node=$NUM_GPUS --master_port=29500 train.py \
         --base_model "$BASE_MODEL" \
-        --train_data_path "[\"./data/$DATASET/$TRAIN_DATA_FILE\"]" \
+        --train_data_path "[\"$FULL_TRAIN_PATH\"]" \
         --val_data_path "[\"./data/$DATASET/valid_5000.json\"]" \
         --output_dir "$OUTPUT_DIR" \
         --batch_size $BATCH_SIZE \
@@ -67,7 +77,7 @@ else
     echo "Using single GPU training."
     CUDA_VISIBLE_DEVICES=$GPU_ID python train.py \
         --base_model "$BASE_MODEL" \
-        --train_data_path "[\"./data/$DATASET/$TRAIN_DATA_FILE\"]" \
+        --train_data_path "[\"$FULL_TRAIN_PATH\"]" \
         --val_data_path "[\"./data/$DATASET/valid_5000.json\"]" \
         --output_dir "$OUTPUT_DIR" \
         --batch_size $BATCH_SIZE \

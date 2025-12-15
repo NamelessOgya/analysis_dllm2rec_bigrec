@@ -1,0 +1,3 @@
+dataset_name,seed,alpha,sampling_strategy,sample_num,al_ratio,base_model_name,templete,ed_weight,lambda,GPUID
+game_bigrec,2024,1.0,loss,1000,1.0,Qwen/Qwen2-0.5B,,0.3,0.7,0
+game_bigrec,2024,1.0,random,1000,1.0,Qwen/Qwen2-0.5B,,0.3,0.7,1

@@ -56,7 +56,10 @@ if [ "$AL_RATIO" != "1.0" ]; then
     RATIO_SUFFIX="_ratio${AL_RATIO}"
 fi
 
-OUTPUT_JSON="$BIGREC_DIR/data/$DATASET/train_${METHOD}_${SAMPLE_NUM}${RATIO_SUFFIX}_seed${SEED}${MODEL_SUFFIX}.json"
+if [ -z "$OUTPUT_JSON" ]; then
+    echo "Error: OUTPUT_JSON environment variable is required."
+    exit 1
+fi
 
 # Check if data exists
 if [ ! -f "$INPUT_JSON" ]; then

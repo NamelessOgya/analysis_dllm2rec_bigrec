@@ -80,12 +80,17 @@ SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
 
 # Define paths
 BIGREC_DIR="BIGRec"
-RESULT_DIR="BIGRec/results/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+if [ -z "$RESULT_DIR" ]; then
+    echo "Error: RESULT_DIR environment variable is required."
+    exit 1
+fi
 DATA_DIR="BIGRec/data/$DATASET"
 
 # Construct LoRA weights path
 BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
-LORA_WEIGHTS="$BASE_LORA_PATH"
+if [ -z "$LORA_WEIGHTS" ]; then
+    LORA_WEIGHTS="$BASE_LORA_PATH"
+fi
 EPOCH_SUFFIX="_epoch_best" # Default suffix
 
 # Check for specific checkpoint

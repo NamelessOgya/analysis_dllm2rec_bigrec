@@ -1,0 +1,50 @@
+stages:
+  sasrec_game_bigrec_2024_1p0:
+    cmd: OUTPUT_DIR=experiments/game_bigrec/sasrec/seed_2024/alpha_1.0 ./cmd/run_sasrec_baseline.sh
+      game_bigrec 1 200 2024 1.0
+    deps:
+    - cmd/run_sasrec_baseline.sh
+    - DLLM2Rec/main.py
+    outs:
+    - experiments/game_bigrec/sasrec/seed_2024/alpha_1.0/train.pt
+    - experiments/game_bigrec/sasrec/seed_2024/alpha_1.0/train_uids.pt
+  al_data_random_1000_1p0_seed_2024_alpha_1p0:
+    cmd: 'OUTPUT_JSON=experiments/game_bigrec/active_learning/random_1000_1.0_seed_2024_alpha_1.0.json
+      ./cmd/create_active_learning_data.sh game_bigrec random 1000 1.0 2024 1024 '
+    deps:
+    - cmd/create_active_learning_data.sh
+    outs:
+    - experiments/game_bigrec/active_learning/random_1000_1.0_seed_2024_alpha_1.0.json
+  bigrec_train_random_1000_1p0_seed_2024_alpha_1p0:
+    cmd: OUTPUT_DIR=experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_train/random_1000_1.0_seed_2024_alpha_1.0
+      ./cmd/run_bigrec_train.sh game_bigrec 1 2024 -1 128 4 Qwen/Qwen2-0.5B 50 ""
+      "experiments/game_bigrec/active_learning/random_1000_1.0_seed_2024_alpha_1.0.json"
+    deps:
+    - cmd/run_bigrec_train.sh
+    - experiments/game_bigrec/active_learning/random_1000_1.0_seed_2024_alpha_1.0.json
+    outs:
+    - experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_train/random_1000_1.0_seed_2024_alpha_1.0
+  bigrec_infer_random_1000_1p0_seed_2024_alpha_1p0:
+    cmd: RESULT_DIR=experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_infer_train/random_1000_1.0_seed_2024_alpha_1.0
+      ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 1 --model Qwen/Qwen2-0.5B
+      --seed 2024 --sample -1 --checkpoint best --test_data train.json --correction
+      ci --resource experiments/game_bigrec/sasrec/seed_2024/alpha_1.0 --lora_weights
+      experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_train/random_1000_1.0_seed_2024_alpha_1.0
+    deps:
+    - experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_train/random_1000_1.0_seed_2024_alpha_1.0
+    - experiments/game_bigrec/sasrec/seed_2024/alpha_1.0
+    - cmd/run_bigrec_inference_vllm.sh
+    outs:
+    - experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_infer_train/random_1000_1.0_seed_2024_alpha_1.0/train_epoch_best.json
+  dllm2rec_random_1000_1p0_seed_2024_alpha_1p0_ed0.3_lam0.7:
+    cmd: OUTPUT_DIR=experiments/game_bigrec/Qwen_Qwen2-0.5B/dllm2rec_final/random_1000_1.0_seed_2024_alpha_1.0/ed_0.3_lam_0.7
+      RANKING_PATH=experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_infer_train/random_1000_1.0_seed_2024_alpha_1.0/train_epoch_best_rank.txt
+      CONFIDENCE_PATH=experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_infer_train/random_1000_1.0_seed_2024_alpha_1.0/train_epoch_best_score.txt
+      EMBEDDING_PATH=BIGRec/data/game_bigrec/model_embeddings/Qwen_Qwen2-0.5B.pt ./cmd/run_dllm2rec_train.sh
+      game_bigrec SASRec 1 0.3 0.7
+    deps:
+    - experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_infer_train/random_1000_1.0_seed_2024_alpha_1.0/train_epoch_best_rank.txt
+    - experiments/game_bigrec/Qwen_Qwen2-0.5B/bigrec_infer_train/random_1000_1.0_seed_2024_alpha_1.0/train_epoch_best_score.txt
+    - cmd/run_dllm2rec_train.sh
+    outs:
+    - experiments/game_bigrec/Qwen_Qwen2-0.5B/dllm2rec_final/random_1000_1.0_seed_2024_alpha_1.0/ed_0.3_lam_0.7/metrics.json

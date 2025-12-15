@@ -46,6 +46,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=2024, help='Random seed for student (and implies teacher seed)')
     parser.add_argument('--teacher_sample', type=str, default="", help='Sample size of teacher model for directory naming')
     parser.add_argument('--export_train_scores', action='store_true', help='If True, export train scores (train.pt) at the end')
+    parser.add_argument('--output_dir', type=str, default=None, help='Custom output directory.')
     return parser.parse_args()
 
     
@@ -402,37 +403,11 @@ def set_seed(seed):
     torch.manual_seed(seed)
 
 def save_metrics(args, test_hr, test_ndcg, valid_hr, valid_ndcg):
-    # Determine distillation status for directory naming
-    is_distilled = (args.ed_weight > 0 or args.lam > 0)
-    
-    is_distilled = (args.ed_weight > 0 or args.lam > 0)
-    
-    if is_distilled:
-        if args.teacher_model:
-            teacher_name = args.teacher_model.replace('/', '_')
-        else:
-            teacher_name = "unknown_teacher"
-        
-        # Parent directory: [DATASET]/[STUDENT_MODEL]_distilled_[TEACHER_MODEL]
-        parent_dir_name = f"{args.model_name.lower()}_distilled_{teacher_name}"
-        
-        # Hyperparameter directory: ed_[ED_WEIGHT]_lam_[LAM]
-        hyper_dir_name = f"ed_{args.ed_weight}_lam_{args.lam}"
-        
-        # Sub directory: [seed]_[TEACHER_SAMPLE]
-        if args.teacher_sample:
-            sub_dir_name = f"{args.seed}_{args.teacher_sample}"
-        else:
-             sub_dir_name = f"{args.seed}_unknown"
-             
-        # Order: Parent -> Seed/Sample -> Hyperparams
-        output_dir = os.path.join("results", args.data, parent_dir_name, sub_dir_name, hyper_dir_name)
-        
+    if args.output_dir:
+        output_dir = args.output_dir
     else:
-        # No distillation case
-        # [DATASET]/[STUDENT_MODEL]_no_distillation/[seed]/alpha_[ALPHA]
-        hyper_dir_name = f"alpha_{args.alpha}"
-        output_dir = os.path.join("results", args.data, f"{args.model_name.lower()}_no_distillation", str(args.seed), hyper_dir_name)
+        print("WARNING: --output_dir not provided in save_metrics. Using default 'output_default'.")
+        output_dir = os.path.join("results", "output_default")
 
     os.makedirs(output_dir, exist_ok=True)
     
@@ -546,33 +521,14 @@ if __name__ == '__main__':
     num_batches = int(num_rows / args.batch_size)
 
     # Determine output directory early to save .pt files
-    is_distilled = (args.ed_weight > 0 or args.lam > 0)
-    if is_distilled:
-        if args.teacher_model:
-            teacher_name = args.teacher_model.replace('/', '_')
-        else:
-            teacher_name = "unknown_teacher"
-        
-        # Parent directory: [DATASET]/[STUDENT_MODEL]_distilled_[TEACHER_MODEL]
-        parent_dir_name = f"{args.model_name.lower()}_distilled_{teacher_name}"
-        
-        # Hyperparameter directory: ed_[ED_WEIGHT]_lam_[LAM]
-        hyper_dir_name = f"ed_{args.ed_weight}_lam_{args.lam}"
-        
-        # Sub directory: [seed]_[TEACHER_SAMPLE]
-        if args.teacher_sample:
-            sub_dir_name = f"{args.seed}_{args.teacher_sample}"
-        else:
-             sub_dir_name = f"{args.seed}_unknown"
-             
-        # Order: Parent -> Seed/Sample -> Hyperparams
-        output_dir = os.path.join("results", args.data, parent_dir_name, sub_dir_name, hyper_dir_name)
-        
+    if args.output_dir:
+        output_dir = args.output_dir
     else:
-        # No distillation case
-        # [DATASET]/[STUDENT_MODEL]_no_distillation/[seed]/alpha_[ALPHA]
-        hyper_dir_name = f"alpha_{args.alpha}"
-        output_dir = os.path.join("results", args.data, f"{args.model_name.lower()}_no_distillation", str(args.seed), hyper_dir_name)
+        # Fallback to simple default if not provided (though wrapper script should enforce it)
+        # Or raise error to be strict?
+        # Let's keep a simple default just in case of manual isolated runs without wrapper
+        print("WARNING: --output_dir not provided. Using default 'output_default'.")
+        output_dir = os.path.join("results", "output_default")
 
     os.makedirs(output_dir, exist_ok=True)
     print(f"Results will be saved to: {output_dir}")

@@ -34,6 +34,16 @@ cd DLLM2Rec
 # Explicitly set ed_weight=0 and lam=0 to ensure we use "no_distillation" directory structure
 # Add --export_train_scores to always export train.pt/train_uids.pt for potential BIGRec usage
 SECONDS=0
+# Handle output directory override
+# Mandate output directory
+if [ -z "$OUTPUT_DIR" ]; then
+    echo "Error: OUTPUT_DIR environment variable is required."
+    exit 1
+fi
+echo "Using output directory: $OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+EXTRA_ARGS="--output_dir $OUTPUT_DIR"
+
 python main.py \
     --data $DATASET \
     --model_name SASRec \
@@ -43,7 +53,8 @@ python main.py \
     --seed $SEED \
     --ed_weight 0 \
     --lam 0 \
-    --export_train_scores
+    --export_train_scores \
+    $EXTRA_ARGS
 
 duration=$SECONDS
 echo "SASRec baseline training completed in $(($duration / 60)) minutes and $(($duration % 60)) seconds"

@@ -30,10 +30,16 @@ if [ -n "$BIGREC_BASE_MODEL" ]; then
     ROOT_DIR=$(pwd)
     
     # Construct paths
-    EMBEDDING_PATH="$ROOT_DIR/BIGRec/data/$DATASET/model_embeddings/${SAFE_MODEL_NAME}.pt"
+    if [ -z "$EMBEDDING_PATH" ]; then
+        EMBEDDING_PATH="$ROOT_DIR/BIGRec/data/$DATASET/model_embeddings/${SAFE_MODEL_NAME}.pt"
+    fi
     RESULT_DIR="$ROOT_DIR/BIGRec/results/$DATASET/$SAFE_MODEL_NAME/${BIGREC_SEED}_${BIGREC_SAMPLE}"
-    RANKING_PATH="$RESULT_DIR/train${BIGREC_EPOCH_SUFFIX}_rank.txt"
-    CONFIDENCE_PATH="$RESULT_DIR/train${BIGREC_EPOCH_SUFFIX}_score.txt"
+    if [ -z "$RANKING_PATH" ]; then
+        RANKING_PATH="$RESULT_DIR/train${BIGREC_EPOCH_SUFFIX}_rank.txt"
+    fi
+    if [ -z "$CONFIDENCE_PATH" ]; then
+        CONFIDENCE_PATH="$RESULT_DIR/train${BIGREC_EPOCH_SUFFIX}_score.txt"
+    fi
     
     # Check if files exist (optional but good for debugging)
     if [ ! -f "$RANKING_PATH" ]; then
@@ -42,6 +48,15 @@ if [ -n "$BIGREC_BASE_MODEL" ]; then
     
     EXTRA_ARGS="--embedding_path $EMBEDDING_PATH --ranking_path $RANKING_PATH --confidence_path $CONFIDENCE_PATH"
 fi
+
+# Mandate output directory override
+if [ -z "$OUTPUT_DIR" ]; then
+    echo "Error: OUTPUT_DIR environment variable is required."
+    exit 1
+fi
+echo "Using output directory: $OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+EXTRA_ARGS="$EXTRA_ARGS --output_dir $OUTPUT_DIR"
 
 # Define paths
 DLLM2REC_DIR="DLLM2Rec"
