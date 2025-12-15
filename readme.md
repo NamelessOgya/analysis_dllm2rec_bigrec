@@ -304,3 +304,72 @@ BIGRecの推論結果（DROS適用済み）をDLLM2Recに蒸留するための�
     このスクリプトは自動的に以下のパスにある教師データを探索して使用します:
     `BIGRec/results/game_bigrec/Qwen_Qwen2-0.5B/0_1024/train_epoch_best_rank.txt`
 
+### 12. Active Learning 学習データの作成
+
+Active Learning (DROSの推論結果などを利用したサンプリング) に基づく BIGRec 学習データを作成します。
+
+```bash
+```bash
+```bash
+# 引数: <dataset> <method> <sample_num> <al_ratio> <seed> <batch_size> <dros_source> <min_rank> <max_rank>
+# method: 
+#   - random: ランダム
+#   - pop_inverse: 逆人気度
+#   - clustering: K-Means (Semantic Diversity)
+#   - loss: Loss Maximization (Hard)
+#   - entropy: Entropy Maximization (Uncertainty)
+#   - error_rank: Error Rank (Bad Prediction)
+#   - proximal_rank: Proximal Hardness (Rank [min, max] の範囲を抽出)
+#   - semantic_loss: Semantic Hard (Clustering + Loss)
+#   - confident_error: Confident Student (High Confidence But Wrong)
+# sample_num: サンプリング数 (例: 10000)
+# al_ratio: AL選択の割合 (0.0~1.0, デフォルト1.0)
+# dros_source: DROSスコアパス (デフォルトSASRec結果)
+# min_rank / max_rank: proximal_rank用 (デフォルト 10 / 100)
+
+# 例: Loss-Based Sampling using default DROS
+./cmd/create_active_learning_data.sh game_bigrec loss 30000
+
+# 例: Proximal Hardness (Rank 10~50 を抽出)
+./cmd/create_active_learning_data.sh game_bigrec proximal_rank 10000 1.0 42 1024 "" 10 50
+```
+
+作成されたデータは以下の形式で `BIGRec/data/game_bigrec/` に保存されます。
+
+`train_{method}_{sample_num}_ratio{al_ratio}_seed{seed}_{model_suffix}.json`
+
+*   `model_suffix`:
+    *   DROSベースの手法の場合: DROSソースパスのディレクトリ名 (例: `_alpha_1.0`)
+    *   その他: 空文字
+*   `ratio{al_ratio}`: 1.0 以外の場合のみ付与されます。
+
+これらを `run_bigrec_train.sh` に渡すことで、Active Learning を用いた学習が可能になります。
+※ DROSベースの手法を使用する場合、`dros_source` で指定したディレクトリに `train.pt` と `train_uids.pt` が存在する必要があります。
+
+#### Active Learning 学習の実行
+
+作成したデータを BIGRec の学習に使用する例です。
+ここで重要なのは、**`SAMPLE` 引数には `-1` (全件使用) を指定すること** です。
+(すでにサンプリング済みデータであるため、再サンプリングを防ぐためです)
+
+```bash
+# 引数: <dataset> ... <train_data_file> <model_suffix>
+# 第10引数: 学習データファイル名 (パスではなくファイル名)
+# 第11引数: 出力ディレクトリのSuffix (上書き防止用)
+
+# 例: Lossサンプリングデータ (30000件) で学習
+./cmd/run_bigrec_train.sh \
+    game_bigrec \
+    0 \
+    0 \
+    -1 \
+    128 \
+    128 \
+    "Qwen/Qwen2-0.5B" \
+    50 \
+    "" \
+    "train_loss_30000_seed42_alpha_1.0.json" \
+    "_loss_30k"
+
+# 出力先: BIGRec/model/game_bigrec/.../0_-1_loss_30k/
+```

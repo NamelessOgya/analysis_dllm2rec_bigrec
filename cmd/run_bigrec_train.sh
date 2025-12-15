@@ -13,8 +13,12 @@ MICRO_BATCH_SIZE=${6:-4}
 BASE_MODEL=${7:-"Qwen/Qwen2-0.5B"}
 NUM_EPOCHS=${8:-50}
 PROMPT_FILE=${9:-""}
+TRAIN_DATA_FILE=${10:-"train.json"}
+MODEL_SUFFIX=${11:-""}
 
 echo "Running BIGRec training for dataset: $DATASET"
+echo "  - Train Data: $TRAIN_DATA_FILE"
+echo "  - Suffix: $MODEL_SUFFIX"
 
 # Sanitize model name for directory usage (replace / with _)
 SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
@@ -22,7 +26,7 @@ SAFE_MODEL_NAME=$(echo "$BASE_MODEL" | tr '/' '_')
 # Define paths
 BIGREC_DIR="BIGRec"
 # Use absolute path for output directory to avoid issues when changing directory
-OUTPUT_DIR="$(pwd)/BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+OUTPUT_DIR="$(pwd)/BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}${MODEL_SUFFIX}"
 
 # Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
@@ -42,7 +46,7 @@ if [ "$NUM_GPUS" -gt 1 ]; then
     echo "Detected $NUM_GPUS GPUs. Using torchrun for distributed training."
     CUDA_VISIBLE_DEVICES=$GPU_ID torchrun --nproc_per_node=$NUM_GPUS --master_port=29500 train.py \
         --base_model "$BASE_MODEL" \
-        --train_data_path "[\"./data/$DATASET/train.json\"]" \
+        --train_data_path "[\"./data/$DATASET/$TRAIN_DATA_FILE\"]" \
         --val_data_path "[\"./data/$DATASET/valid_5000.json\"]" \
         --output_dir "$OUTPUT_DIR" \
         --batch_size $BATCH_SIZE \
@@ -63,7 +67,7 @@ else
     echo "Using single GPU training."
     CUDA_VISIBLE_DEVICES=$GPU_ID python train.py \
         --base_model "$BASE_MODEL" \
-        --train_data_path "[\"./data/$DATASET/train.json\"]" \
+        --train_data_path "[\"./data/$DATASET/$TRAIN_DATA_FILE\"]" \
         --val_data_path "[\"./data/$DATASET/valid_5000.json\"]" \
         --output_dir "$OUTPUT_DIR" \
         --batch_size $BATCH_SIZE \
