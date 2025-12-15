@@ -26,7 +26,7 @@ if [ -d "experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5
     echo "Skipping BIGRec Train (Output dir exists and not empty: experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_1_alpha_0.5)"
 else
     echo "Running BIGRec Train..."
-    OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_1_alpha_0.5 ./cmd/run_bigrec_train.sh game_bigrec 1 1 -1 128 16 google/gemma-2B-it 50 "prompt_templete_gemma.txt" "experiments/game_bigrec/active_learning/random_1000_0.5_seed_1_alpha_0.5.json"
+    OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_1_alpha_0.5 ./cmd/run_bigrec_train.sh game_bigrec 1 1 -1 128 16 google/gemma-2B-it 50 "templates/prompt_templete_gemma.txt" "experiments/game_bigrec/active_learning/random_1000_0.5_seed_1_alpha_0.5.json"
 fi
 
 # --- Step 4: BIGRec Inference ---
@@ -69,7 +69,7 @@ if [ -d "experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5
     echo "Skipping BIGRec Train (Output dir exists and not empty: experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_3_alpha_0.5)"
 else
     echo "Running BIGRec Train..."
-    OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_3_alpha_0.5 ./cmd/run_bigrec_train.sh game_bigrec 1 3 -1 128 16 google/gemma-2B-it 50 "prompt_templete_gemma.txt" "experiments/game_bigrec/active_learning/random_1000_0.5_seed_3_alpha_0.5.json"
+    OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_3_alpha_0.5 ./cmd/run_bigrec_train.sh game_bigrec 1 3 -1 128 16 google/gemma-2B-it 50 "templates/prompt_templete_gemma.txt" "experiments/game_bigrec/active_learning/random_1000_0.5_seed_3_alpha_0.5.json"
 fi
 
 # --- Step 4: BIGRec Inference ---
@@ -112,7 +112,7 @@ if [ -d "experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_
     echo "Skipping BIGRec Train (Output dir exists and not empty: experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_1_alpha_0.5)"
 else
     echo "Running BIGRec Train..."
-    OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_1_alpha_0.5 ./cmd/run_bigrec_train.sh game_bigrec 1 1 -1 128 16 google/gemma-2B-it 50 "prompt_templete_gemma.txt" "experiments/game_bigrec/active_learning/random_100_0.5_seed_1_alpha_0.5.json"
+    OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_1_alpha_0.5 ./cmd/run_bigrec_train.sh game_bigrec 1 1 -1 128 16 google/gemma-2B-it 50 "templates/prompt_templete_gemma.txt" "experiments/game_bigrec/active_learning/random_100_0.5_seed_1_alpha_0.5.json"
 fi
 
 # --- Step 4: BIGRec Inference ---
@@ -155,7 +155,7 @@ if [ -d "experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_
     echo "Skipping BIGRec Train (Output dir exists and not empty: experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_3_alpha_0.5)"
 else
     echo "Running BIGRec Train..."
-    OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_3_alpha_0.5 ./cmd/run_bigrec_train.sh game_bigrec 1 3 -1 128 16 google/gemma-2B-it 50 "prompt_templete_gemma.txt" "experiments/game_bigrec/active_learning/random_100_0.5_seed_3_alpha_0.5.json"
+    OUTPUT_DIR=experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_3_alpha_0.5 ./cmd/run_bigrec_train.sh game_bigrec 1 3 -1 128 16 google/gemma-2B-it 50 "templates/prompt_templete_gemma.txt" "experiments/game_bigrec/active_learning/random_100_0.5_seed_3_alpha_0.5.json"
 fi
 
 # --- Step 4: BIGRec Inference ---

@@ -90,7 +90,7 @@ def generate_bash_pipeline(csv_path):
                 
                 # === Step 3: BIGRec Training ===
                 bigrec_train_dir = f"{exp_root}/{safe_base_model}/bigrec_train/{al_suffix}"
-                prompt_arg = template if template else ""
+                prompt_arg = f"templates/{template}" if template else ""
                 # run_bigrec_train.sh creates the directory, so we check directory existence or a specific file inside?
                 # Usually checking the directory is safer if the script handles resume or overwrite. 
                 # But here we want to skip if DONE. Directory might exist but be empty if failed?
