@@ -40,6 +40,12 @@ if [ -z "$OUTPUT_DIR" ]; then
     echo "Error: OUTPUT_DIR environment variable is required."
     exit 1
 fi
+# Fix paths if they are relative to repo root (e.g. start with experiments/)
+# because we will cd into DLLM2Rec
+if [[ "$OUTPUT_DIR" == experiments/* ]]; then
+    OUTPUT_DIR="../$OUTPUT_DIR"
+fi
+
 echo "Using output directory: $OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 EXTRA_ARGS="--output_dir $OUTPUT_DIR"

@@ -50,13 +50,37 @@ if [ -n "$BIGREC_BASE_MODEL" ]; then
 fi
 
 # Mandate output directory override
+# Mandate output directory override
 if [ -z "$OUTPUT_DIR" ]; then
     echo "Error: OUTPUT_DIR environment variable is required."
     exit 1
 fi
+
+# Fix paths if they are relative to repo root (e.g. start with experiments/ or BIGRec/)
+# because we will cd into DLLM2Rec
+if [[ "$OUTPUT_DIR" == experiments/* ]]; then
+    OUTPUT_DIR="../$OUTPUT_DIR"
+fi
+if [[ "$EMBEDDING_PATH" == BIGRec/* ]]; then
+    EMBEDDING_PATH="../$EMBEDDING_PATH"
+fi
+if [[ "$RANKING_PATH" == experiments/* ]]; then
+    RANKING_PATH="../$RANKING_PATH"
+fi
+if [[ "$CONFIDENCE_PATH" == experiments/* ]]; then
+    CONFIDENCE_PATH="../$CONFIDENCE_PATH"
+fi
+
 echo "Using output directory: $OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 EXTRA_ARGS="$EXTRA_ARGS --output_dir $OUTPUT_DIR"
+
+# Append external paths to EXTRA_ARGS if they are set (and not already added by BIGREC_BASE_MODEL block)
+if [ -z "$BIGREC_BASE_MODEL" ]; then
+    if [ -n "$EMBEDDING_PATH" ]; then EXTRA_ARGS="$EXTRA_ARGS --embedding_path $EMBEDDING_PATH"; fi
+    if [ -n "$RANKING_PATH" ]; then EXTRA_ARGS="$EXTRA_ARGS --ranking_path $RANKING_PATH"; fi
+    if [ -n "$CONFIDENCE_PATH" ]; then EXTRA_ARGS="$EXTRA_ARGS --confidence_path $CONFIDENCE_PATH"; fi
+fi
 
 # Define paths
 DLLM2REC_DIR="DLLM2Rec"
