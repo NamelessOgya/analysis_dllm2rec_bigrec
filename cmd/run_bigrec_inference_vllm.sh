@@ -88,8 +88,11 @@ fi
 DATA_DIR="BIGRec/data/$DATASET"
 
 # Construct LoRA weights path
-BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
-if [ -z "$LORA_WEIGHTS" ]; then
+# Construct LoRA weights path
+if [ -n "$LORA_WEIGHTS" ]; then
+    BASE_LORA_PATH="$LORA_WEIGHTS"
+else
+    BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
     LORA_WEIGHTS="$BASE_LORA_PATH"
 fi
 EPOCH_SUFFIX="_epoch_best" # Default suffix
