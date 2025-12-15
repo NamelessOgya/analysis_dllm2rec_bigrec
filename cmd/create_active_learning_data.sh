@@ -4,14 +4,20 @@
 set -e
 
 # Arguments
-# Arguments
 DATASET=${1:-game_bigrec}
-METHOD=${2:-loss} # random, pop_inverse, clustering, loss, entropy, error_rank
-SAMPLE_NUM=${3:-10000}
+METHOD=${2:-random} # random, pop_inverse, clustering, loss, entropy, error_rank
+SAMPLE_NUM=${3:-1000}
 AL_RATIO=${4:-1.0}
 SEED=${5:-42}
 BATCH_SIZE=${6:-1024}
 DROS_SOURCE=${7:-""}
+MIN_RANK=${8:-10}
+MAX_RANK=${9:-100}
+
+echo "Dataset: $DATASET"
+echo "Method: $METHOD"
+echo "Sample Num: $SAMPLE_NUM"
+echo "AL Ratio: $AL_RATIO"
 
 # Optional Paths (can be overridden by environment variables or arguments if we extend this script, 
 # but for now we follow the project structure)
@@ -59,7 +65,7 @@ if [ ! -f "$INPUT_JSON" ]; then
 fi
 
 # Construct command
-CMD="python3 $BIGREC_DIR/data/game_bigrec/sample_data.py \
+CMD="python3 $BIGREC_DIR/data/$DATASET/sample_data.py \
     --input_json $INPUT_JSON \
     --input_df $INPUT_DF \
     --method $METHOD \
@@ -70,7 +76,7 @@ CMD="python3 $BIGREC_DIR/data/game_bigrec/sample_data.py \
     --batch_size $BATCH_SIZE"
 
 # Add DROS args if needed
-if [[ "$METHOD" == "loss" || "$METHOD" == "entropy" || "$METHOD" == "error_rank" ]]; then
+if [[ "$METHOD" == "loss" || "$METHOD" == "entropy" || "$METHOD" == "error_rank" || "$METHOD" == "proximal_rank" || "$METHOD" == "semantic_loss" || "$METHOD" == "confident_error" ]]; then
     if [ ! -f "$DROS_SCORE" ]; then
         echo "Error: DROS score file not found at $DROS_SCORE. Please run SASRec baseline first."
         exit 1
@@ -78,8 +84,8 @@ if [[ "$METHOD" == "loss" || "$METHOD" == "entropy" || "$METHOD" == "error_rank"
     CMD="$CMD --dros_score $DROS_SCORE --dros_uid $DROS_UID"
 fi
 
-# Add Clustering args if needed
-if [[ "$METHOD" == "clustering" ]]; then
+# Add Embedding args if needed
+if [[ "$METHOD" == "clustering" || "$METHOD" == "semantic_loss" ]]; then
     if [ ! -f "$ITEM_EMB" ]; then
         echo "Error: Item embeddings not found at $ITEM_EMB."
         exit 1

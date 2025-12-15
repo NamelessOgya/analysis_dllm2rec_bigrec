@@ -311,17 +311,27 @@ Active Learning (DROSの推論結果などを利用したサンプリング) に
 ```bash
 ```bash
 ```bash
-# 引数: <dataset> <method> <sample_num> <al_ratio> <seed> <batch_size> <dros_source>
-# method: random, pop_inverse, clustering, loss, entropy, error_rank
+# 引数: <dataset> <method> <sample_num> <al_ratio> <seed> <batch_size> <dros_source> <min_rank> <max_rank>
+# method: 
+#   - random: ランダム
+#   - pop_inverse: 逆人気度
+#   - clustering: K-Means (Semantic Diversity)
+#   - loss: Loss Maximization (Hard)
+#   - entropy: Entropy Maximization (Uncertainty)
+#   - error_rank: Error Rank (Bad Prediction)
+#   - proximal_rank: Proximal Hardness (Rank [min, max] の範囲を抽出)
+#   - semantic_loss: Semantic Hard (Clustering + Loss)
+#   - confident_error: Confident Student (High Confidence But Wrong)
 # sample_num: サンプリング数 (例: 10000)
 # al_ratio: AL選択の割合 (0.0~1.0, デフォルト1.0)
-# dros_source: DROSスコア (train.pt) があるディレクトリパス (デフォルトは sasrec_no_distillation/2024/alpha_1.0)
+# dros_source: DROSスコアパス (デフォルトSASRec結果)
+# min_rank / max_rank: proximal_rank用 (デフォルト 10 / 100)
 
-# 例: Loss-Based Sampling (30000件, 混合なし) - デフォルトDROSパス使用
+# 例: Loss-Based Sampling using default DROS
 ./cmd/create_active_learning_data.sh game_bigrec loss 30000
 
-# 例: 特定のSASRec学習結果を用いてサンプリングする場合
-./cmd/create_active_learning_data.sh game_bigrec error_rank 10000 1.0 42 1024 "DLLM2Rec/results/game_bigrec/sasrec_no_distillation/2025/alpha_0.5/"
+# 例: Proximal Hardness (Rank 10~50 を抽出)
+./cmd/create_active_learning_data.sh game_bigrec proximal_rank 10000 1.0 42 1024 "" 10 50
 ```
 
 作成されたデータは以下の形式で `BIGRec/data/game_bigrec/` に保存されます。

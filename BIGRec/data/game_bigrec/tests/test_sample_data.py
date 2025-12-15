@@ -151,5 +151,82 @@ class TestSampleData(unittest.TestCase):
         uids = [d['meta']['uid'] for d in data]
         self.assertIn(1, uids) # 1 is High Loss (Hard), should be picked by AL part.
 
+    def test_proximal_rank(self):
+        # We need to setup specific ranks.
+        # UID 2: Rank 20 (Target=0, Logit[0]=0.1, 19 items have >0.1)
+        # We can mock this by manipulating logits in setUp or just re-saving here?
+        # Re-saving for specific test is cleaner but file access might conflict if parallel (which is not).
+        
+        # Modify Logits
+        logits = torch.randn(self.N, self.ItemNum) * 0.1
+        # UID 2: Target 0. Make it Rank ~20.
+        # Set 19 items to score 10.0, Target(0) to 5.0, others 0.0
+        logits[2, 1:20] = 10.0
+        logits[2, 0] = 5.0 # Rank 20
+        
+        # UID 3: Rank 1 (Target 0, score 10.0, others 0)
+        logits[3, 0] = 10.0
+        
+        # UID 4: Rank 500 (Way bad). ItemNum is 50, so max rank 50.
+        # Let's say max rank (Target score -10, others 0). Rank 50.
+        logits[4, 0] = -10.0
+        
+        torch.save(logits, self.score_path)
+        
+        # Test: Min Rank 10, Max Rank 30. Should pick UID 2. UID 3 (Rank 1) excluded.
+        cmd = [
+            'python3', self.script_path,
+            '--input_json', self.json_path,
+            '--input_df', self.df_path,
+            '--dros_score', self.score_path,
+            '--dros_uid', self.uid_path,
+            '--item_emb', self.emb_path,
+            '--method', 'proximal_rank',
+            '--sample_num', '10',
+            '--min_rank', '10',
+            '--max_rank', '30',
+            '--output_json', os.path.join(self.test_dir, 'out_prox.json')
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0)
+        
+        with open(os.path.join(self.test_dir, 'out_prox.json'), 'r') as f:
+            data = json.load(f)
+        uids = [d['meta']['uid'] for d in data]
+        self.assertIn(2, uids)
+        self.assertNotIn(3, uids) # Rank 1 is too good
+        self.assertNotIn(4, uids) # Rank 50 is too bad
+
+    def test_confident_error(self):
+        # UID 5: Wrong (Rank > 1) AND High Confidence (Logit Max is high)
+        logits = torch.randn(self.N, self.ItemNum) * 0.1
+        # Target 0.
+        # Make Max Logit at index 1 (Wrong) be 20.0 (Very High Prob)
+        logits[5, 1] = 20.0 
+        logits[5, 0] = 0.0 # Target score low -> Rank > 1
+        
+        # UID 6: Correct (Rank 1) AND High Confidence
+        logits[6, 0] = 20.0
+        
+        # UID 7: Wrong (Rank > 1) BUT Low Confidence (Flat logits)
+        logits[7, :] = 0.1
+        logits[7, 0] = 0.0
+        
+        torch.save(logits, self.score_path)
+        
+        sample_num = 1
+        output_path = self.run_script('confident_error', sample_num, 'out_conf_err.json')
+        with open(output_path, 'r') as f:
+            data = json.load(f)
+        uids = [d['meta']['uid'] for d in data]
+        self.assertIn(5, uids) # Confident Error should be top priority
+        self.assertNotIn(6, uids) # Correct items skipped
+        # UID 7 has low score (MaxProb ~ 1/N), so UID 5 (MaxProb ~ 1.0) wins.
+
+    def test_semantic_loss(self):
+        # Hard to deterministic test clustering without fixed seeds/embeddings, but we can check runability.
+        output_path = self.run_script('semantic_loss', 10, 'out_sem_loss.json')
+        self.assertTrue(os.path.exists(output_path))
+
 if __name__ == '__main__':
     unittest.main()

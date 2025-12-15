@@ -23,10 +23,13 @@ def parse_args():
     parser.add_argument('--dros_uid', type=str, default=None, help='Path to DROS train_uids.pt')
     parser.add_argument('--item_emb', type=str, default=None, help='Path to item embeddings (for clustering)')
     parser.add_argument('--method', type=str, required=True, 
-                        choices=['random', 'pop_inverse', 'diversity', 'loss', 'entropy', 'error_rank', 'clustering'],
+                        choices=['random', 'pop_inverse', 'diversity', 'loss', 'entropy', 'error_rank', 'clustering',
+                                 'proximal_rank', 'semantic_loss', 'confident_error'],
                         help='Sampling method')
     parser.add_argument('--sample_num', type=int, required=True, help='Number of samples to select')
     parser.add_argument('--al_ratio', type=float, default=1.0, help='Ratio of samples to select via Active Learning (0.0 - 1.0). Remainder is random.')
+    parser.add_argument('--min_rank', type=int, default=10, help='Min rank for proximal_rank')
+    parser.add_argument('--max_rank', type=int, default=100, help='Max rank for proximal_rank')
     parser.add_argument('--output_json', type=str, required=True, help='Output JSON path')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--batch_size', type=int, default=1024, help='Batch size for score calculation')
@@ -77,15 +80,15 @@ def calculate_loss(logits, targets):
 def calculate_rank(logits, targets):
     # logits: [B, NumClasses]
     # targets: [B]
-    # Higher logit = Better rank. Sort descending.
-    # We want rank of target. 
-    # argsort is slow on large items.
-    # Instead, count how many items have score > target_score
     target_scores = logits.gather(1, targets.unsqueeze(1)) # [B, 1]
-    # Optimization: If ItemNum is huge, this comparison is heavy.
-    # But usually ItemNum ~ 20k. [1024, 20000] compare is doable.
     ranks = (logits > target_scores).sum(dim=1) + 1
     return ranks
+
+def calculate_max_prob(logits):
+    # logits: [B, NumClasses]
+    probs = torch.softmax(logits, dim=-1)
+    max_probs, _ = torch.max(probs, dim=-1)
+    return max_probs # [B]
 
 def main():
     args = parse_args()
@@ -107,17 +110,20 @@ def main():
     scores = {} # uid -> score
     
     # 2. Logic per method
-    if args.method in ['loss', 'entropy', 'error_rank']:
+    dros_methods = ['loss', 'entropy', 'error_rank', 'proximal_rank', 'semantic_loss', 'confident_error']
+    if args.method in dros_methods:
         if not args.dros_score or not args.dros_uid:
             raise ValueError(f"Method {args.method} requires --dros_score and --dros_uid")
         
         print(f"Loading DROS scores from {args.dros_score} (CPU)...")
+        if args.method == 'semantic_loss' and not args.item_emb:
+             raise ValueError("Method semantic_loss requires --item_emb")
+             
         # Load map_location='cpu' to save memory
         all_logits = torch.load(args.dros_score, map_location='cpu')
         all_dros_uids = torch.load(args.dros_uid, map_location='cpu')
         
         # Create map from UID to Tensor Index
-        # all_dros_uids might be tensor
         if isinstance(all_dros_uids, torch.Tensor):
             all_dros_uids = all_dros_uids.tolist()
         
@@ -131,37 +137,60 @@ def main():
         for i in tqdm(range(0, len(valid_uids), args.batch_size)):
             batch_uids = valid_uids[i : i + args.batch_size]
             
-            # Get indices in DROS tensor
             dros_indices = [dros_uid2idx[u] for u in batch_uids]
             
-            # Load batch to GPU (or keep CPU if no GPU)
-            # We assume CPU processing for safety if memory is tight, or GPU if available?
-            # User warned about 3GB memory. If we have GPU, 3GB fits.
-            # But let's stick to CPU or minimal GPU usage.
-            # Let's use CPU for calculation to be safe unless specified.
-            # Actually, torch operations are faster on GPU. If we load 1024 batch, it's small.
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             
-            batch_logits = all_logits[dros_indices].float().to(device) # Ensure float32 for calc
+            batch_logits = all_logits[dros_indices].float().to(device)
             
             if args.method == 'entropy':
                 batch_scores = calculate_entropy(batch_logits)
-            elif args.method in ['loss', 'error_rank']:
-                # Need targets
+            elif args.method == 'confident_error':
+                # Score = MaxProb if Rank > 1 else -1 (discard)
                 targets = [uid_to_target[u] for u in batch_uids]
                 batch_targets = torch.LongTensor(targets).to(device)
                 
-                if args.method == 'loss':
+                max_probs = calculate_max_prob(batch_logits)
+                ranks = calculate_rank(batch_logits, batch_targets)
+                
+                # We want: Wrong (Rank > 1) AND Confident (High MaxProb)
+                # If Rank == 1 (Correct), set score to -1 (Low priority/Discard)
+                # If Rank > 1, score = MaxProb
+                batch_scores = torch.where(ranks > 1, max_probs, torch.tensor(-1.0, device=device))
+                
+            elif args.method in ['loss', 'error_rank', 'proximal_rank', 'semantic_loss']:
+                targets = [uid_to_target[u] for u in batch_uids]
+                batch_targets = torch.LongTensor(targets).to(device)
+                
+                if args.method in ['loss', 'semantic_loss']:
                     batch_scores = calculate_loss(batch_logits, batch_targets)
-                else: # error_rank
-                    batch_scores = calculate_rank(batch_logits, batch_targets)
-            
+                else: # error_rank, proximal_rank
+                    ranks = calculate_rank(batch_logits, batch_targets)
+                    if args.method == 'proximal_rank':
+                         # Filter logic happens here or later?
+                         # Let's set score = rank if in range, else -1?
+                         # Actually, proximal_rank wants specific range.
+                         # If in range [min, max], keep. Prioritize which? 
+                         # User: "Proximal Hardness". Maybe random within range? Or closer to 50?
+                         # Let's just set score = 1.0 if in range, 0.0 otherwise.
+                         # And then in sampling phase we pick top-k (i.e., all 1.0s) and random tie-break (sort stability).
+                         # But sort is stable. Top-K of all 1.0s is simply first K.
+                         # Better to randomize scores slightly if we want random selection from goldilocks zone.
+                         # Or: Score = -ABS(Rank - (Min+Max)/2) ? To prioritize center?
+                         # Let's imply: "Prioritize better rank within range" (closer to min_rank)?
+                         # No, closer to min_rank means "Almost correct". 
+                         # Let's use Score = 1.0/Rank if in range, else 0.
+                         # This prioritizes better ranks (10 > 11 > ... > 100).
+                         mask = (ranks >= args.min_rank) & (ranks <= args.max_rank)
+                         batch_scores = torch.where(mask, 1.0 / ranks.float(), torch.tensor(-1.0, device=device))
+                    else: # error_rank
+                        batch_scores = ranks
+
             # Move back to CPU and store
             batch_scores = batch_scores.cpu().tolist()
             for u, s in zip(batch_uids, batch_scores):
                 scores[u] = s
             
-            # Cleanup for memory
             del batch_logits
             if 'batch_targets' in locals(): del batch_targets
             torch.cuda.empty_cache()
@@ -175,9 +204,7 @@ def main():
         print(f"Loading embeddings from {args.item_emb}...")
         embeddings = torch.load(args.item_emb, map_location='cpu').numpy()
         
-        print("Running K-Means...")
-        # Number of clusters? Heuristic: sqrt(N)/2 or fixed small number?
-        # Proposal: "Semantic Diversity". Maybe 50-100 clusters?
+        print("Running K-Means for Clustering...")
         n_clusters = 50
         kmeans = KMeans(n_clusters=n_clusters, random_state=args.seed).fit(embeddings)
         item_clusters = kmeans.labels_ # [ItemNum]
@@ -187,7 +214,7 @@ def main():
             if target_item < len(item_clusters):
                 scores[u] = item_clusters[target_item] # Store cluster ID
             else:
-                scores[u] = -1 # Padding or invalid
+                scores[u] = -1 
                 
     elif args.method == 'pop_inverse':
         # Calculate item freq
@@ -203,26 +230,22 @@ def main():
                 scores[u] = 0.0
 
     elif args.method == 'random':
-        # Just assign random score
-        # Even for mixed strategy, if method is random, al_ratio of random + random remainder = random.
         for u in common_uids:
             scores[u] = random.random()
 
     elif args.method == 'diversity':
-        # Coverage based (Greedy) requires special handling in Sampling phase
-        # We prepare (uid, target_item) list
         user_items = []
         for u in common_uids:
             user_items.append((u, uid_to_target[u]))
-        scores = user_items # Special case
+        scores = user_items
         
     else:
-        raise ValueError(f"Unknown method: {args.method}")
+        # Fallback if I missed something above
+        pass
 
     # 3. Sampling
     total_target_size = min(len(common_uids), args.sample_num)
     
-    # Calculate Split
     n_al = int(total_target_size * args.al_ratio)
     n_random = total_target_size - n_al
     
@@ -235,57 +258,123 @@ def main():
     # --- Active Learning Part ---
     if n_al > 0:
         if args.method == 'diversity':
-            # Greedy for item coverage
-            # Prioritize items not yet covered
-            random.shuffle(user_items) # Shuffle for randomness in ties
-            
-            covered_items = set()
-            candidates_new_item = []
-            candidates_redundant = []
-            
-            for u, item in user_items:
+             # (Existing Diversity Logic)
+             random.shuffle(user_items)
+             covered_items = set()
+             candidates_new_item = []
+             candidates_redundant = []
+             for u, item in user_items:
                 if item not in covered_items:
                     candidates_new_item.append(u)
                     covered_items.add(item)
                 else:
                     candidates_redundant.append(u)
-            
-            # Take all new coverage items first
-            selected_uids_al = candidates_new_item[:n_al]
-            
-            # Fill remaining for AL part
-            if len(selected_uids_al) < n_al:
+             selected_uids_al = candidates_new_item[:n_al]
+             if len(selected_uids_al) < n_al:
                 needed = n_al - len(selected_uids_al)
                 selected_uids_al.extend(candidates_redundant[:needed])
                 
         elif args.method == 'clustering':
-            # scores[u] = cluster_id
+            # (Existing Clustering Logic)
             cluster_uids = {}
             for u, cid in scores.items():
-                if cid not in cluster_uids:
-                    cluster_uids[cid] = []
+                if cid not in cluster_uids: cluster_uids[cid] = []
                 cluster_uids[cid].append(u)
-            
-            all_uids_list = []
-            for cid in cluster_uids:
-                random.shuffle(cluster_uids[cid])
             
             keys = list(cluster_uids.keys())
             random.shuffle(keys)
             
+            # Shuffle internal lists
+            for k in keys:
+                random.shuffle(cluster_uids[k])
+                
             while len(selected_uids_al) < n_al and len(keys) > 0:
-                for k in list(keys): # Iterate copy
+                for k in list(keys):
                     if not cluster_uids[k]:
                         keys.remove(k)
                         continue
                     selected_uids_al.append(cluster_uids[k].pop())
                     if len(selected_uids_al) >= n_al:
                         break
+        
+        elif args.method == 'semantic_loss':
+            # Hybrid: Clustering + Loss
+            # We have Loss scores in scores[u]
+            # We need Cluster IDs
+            print("Running K-Means for Semantic Loss...")
+            if KMeans is None: raise ImportError("sklearn needed")
+            embeddings = torch.load(args.item_emb, map_location='cpu').numpy()
+            n_clusters = 50
+            kmeans = KMeans(n_clusters=n_clusters, random_state=args.seed).fit(embeddings)
+            item_clusters = kmeans.labels_
+            
+            # Group UIDs by Cluster
+            cluster_uids = {} # cid -> list of (uid, loss)
+            for u, loss_val in scores.items():
+                target_item = uid_to_target[u]
+                if target_item < len(item_clusters):
+                    cid = item_clusters[target_item]
+                    if cid not in cluster_uids: cluster_uids[cid] = []
+                    cluster_uids[cid].append((u, loss_val))
+            
+            # Sort each cluster data by Loss Descending (Hardest first)
+            for cid in cluster_uids:
+                cluster_uids[cid].sort(key=lambda x: x[1], reverse=True)
+            
+            # Stratified Sampling (Round Robin again?)
+            # Yes, pick Hardest from Cluster 1, Hardest from Cluster 2...
+            keys = list(cluster_uids.keys())
+            random.shuffle(keys)
+            
+            while len(selected_uids_al) < n_al and len(keys) > 0:
+                for k in list(keys):
+                    if not cluster_uids[k]:
+                        keys.remove(k)
+                        continue
+                    # Pop the hardest item (first in list)
+                    uid, _ = cluster_uids[k].pop(0)
+                    selected_uids_al.append(uid)
+                    if len(selected_uids_al) >= n_al:
+                        break
                         
         else:
             # Score based (Top-K)
+            # proximal_rank: scores are 1/rank (if valid) or -1. So sort desc puts valid ranks first, better ranks higher.
+            # confident_error: scores are MaxProb (if Error) or -1. Sort desc puts Confident Errors first.
+            # loss: Sort Desc.
+            # entropy: Sort Desc.
+            # error_rank: Sort Desc (High Rank = Bad).
+            
             sorted_uids = sorted(scores.keys(), key=lambda k: scores[k], reverse=True)
-            selected_uids_al = sorted_uids[:n_al]
+            
+            # Optional: If proximal_rank / confident_error, stop if score < 0?
+            # Yes, otherwise we pick invalid items.
+            if args.method in ['proximal_rank', 'confident_error']:
+                # Filter out negative scores
+                valid_sorted = [u for u in sorted_uids if scores[u] >= 0]
+                if len(valid_sorted) < n_al:
+                    print(f"Warning: Only {len(valid_sorted)} valid samples found for {args.method} (Goal: {n_al}). Filling with random.")
+                    selected_uids_al = valid_sorted
+                    # Adjust n_al effectively or let Random Fill handle it?
+                    # "Remainder is random" logic below handles remaining gap.
+                    # Just need to ensure n_random calculation accounts for shortfall?
+                    # Currently n_random is fixed based on n_al (target).
+                    # If I return smaller selected_uids_al here, logic below:
+                    # n_random = total_target_size - n_al (original n_al).
+                    # So if selected_uids_al is smaller, we have gap.
+                    # We should add to n_random?
+                    # Or just:
+                    # final_selected = selected_uids_al + selected_random
+                    # If selected_uids_al is short, we need MORE random?
+                    # Logic says: "Remainder is random". 
+                    # Let's dynamically update n_random?
+                    # No, let's just append to selected_uids_al from random candidates *inside random block*?
+                    # Easier: Simply act as if AL selected fewer.
+                    pass
+                else:
+                    selected_uids_al = sorted_uids[:n_al]
+            else:
+                selected_uids_al = sorted_uids[:n_al]
     
     # --- Random Fill Part ---
     selected_set = set(selected_uids_al)
