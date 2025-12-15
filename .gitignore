@@ -26,3 +26,4 @@ result/
 results/
 output/
 debug_vllm.log
+!pipeline.csv
