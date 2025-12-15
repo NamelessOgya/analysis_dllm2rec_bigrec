@@ -1,9 +1,9 @@
 dataset_name,seed,alpha,sampling_strategy,sample_num,al_ratio,base_model_name,templete,ed_weight,lambda,GPUID
-game_bigrec,0,0.5,random,1000,0.5,google/gemma-2B-it,prompt_templete_gemma.txt,0.3,0.7,0
-game_bigrec,1,0.5,random,1000,0.5,google/gemma-2B-it,prompt_templete_gemma.txt,0.3,0.7,1
-game_bigrec,2,0.5,random,1000,0.5,google/gemma-2B-it,prompt_templete_gemma.txt,0.3,0.7,0
-game_bigrec,3,0.5,random,1000,0.5,google/gemma-2B-it,prompt_templete_gemma.txt,0.3,0.7,1
-game_bigrec,0,0.5,random,100,0.5,google/gemma-2B-it,prompt_templete_gemma.txt,0.3,0.7,0
-game_bigrec,1,0.5,random,100,0.5,google/gemma-2B-it,prompt_templete_gemma.txt,0.3,0.7,1
-game_bigrec,2,0.5,random,100,0.5,google/gemma-2B-it,prompt_templete_gemma.txt,0.3,0.7,0
-game_bigrec,3,0.5,random,100,0.5,google/gemma-2B-it,prompt_templete_gemma.txt,0.3,0.7,1
+game_bigrec,0,0.5,random,1000,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
+game_bigrec,1,0.5,random,1000,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
+game_bigrec,2,0.5,random,1000,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
+game_bigrec,3,0.5,random,1000,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
+game_bigrec,0,0.5,random,100,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
+game_bigrec,1,0.5,random,100,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
+game_bigrec,2,0.5,random,100,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
+game_bigrec,3,0.5,random,100,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
