@@ -62,7 +62,7 @@ def generate_pipeline(csv_path):
             
             if sasrec_stage_name not in dvc_stages:
                 dvc_stages[sasrec_stage_name] = {
-                    "cmd": f"OUTPUT_DIR={sasrec_dir} ./cmd/run_sasrec_baseline.sh {dataset} {gpu_id} 200 {seed} {alpha}",
+                    "cmd": f"OUTPUT_DIR={sasrec_dir} ../../cmd/run_sasrec_baseline.sh {dataset} {gpu_id} 200 {seed} {alpha}",
                     "deps": [to_dvc_path("cmd/run_sasrec_baseline.sh"), to_dvc_path("DLLM2Rec/main.py")],
                     "outs": [to_dvc_path(f"{sasrec_dir}/train.pt"), to_dvc_path(f"{sasrec_dir}/train_uids.pt")],
                     "wdir": "../.."
@@ -85,7 +85,7 @@ def generate_pipeline(csv_path):
             
             if al_stage_name not in dvc_stages:
                 dvc_stages[al_stage_name] = {
-                    "cmd": f"OUTPUT_JSON={al_file} ./cmd/create_active_learning_data.sh {dataset} {strategy} {sample_num} {al_ratio} {seed} 1024 {dros_source_arg}",
+                    "cmd": f"OUTPUT_JSON={al_file} ../../cmd/create_active_learning_data.sh {dataset} {strategy} {sample_num} {al_ratio} {seed} 1024 {dros_source_arg}",
                     "deps": deps_al,
                     "outs": [to_dvc_path(al_file)],
                     "wdir": "../.."
@@ -99,7 +99,7 @@ def generate_pipeline(csv_path):
             
             if bigrec_train_stage_name not in dvc_stages:
                 dvc_stages[bigrec_train_stage_name] = {
-                    "cmd": f"OUTPUT_DIR={bigrec_train_dir} ./cmd/run_bigrec_train.sh {dataset} {gpu_id} {seed} -1 128 16 {base_model} 50 \"{prompt_arg}\" \"{al_file}\"",
+                    "cmd": f"OUTPUT_DIR={bigrec_train_dir} ../../cmd/run_bigrec_train.sh {dataset} {gpu_id} {seed} -1 128 16 {base_model} 50 \"{prompt_arg}\" \"{al_file}\"",
                     "deps": [to_dvc_path("cmd/run_bigrec_train.sh"), to_dvc_path(al_file)],
                     "outs": [to_dvc_path(bigrec_train_dir)], # It's a directory
                     "wdir": "../.."
@@ -113,7 +113,7 @@ def generate_pipeline(csv_path):
             
             if bigrec_infer_stage_name not in dvc_stages:
                 dvc_stages[bigrec_infer_stage_name] = {
-                    "cmd": f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data train.json --correction ci --resource {sasrec_res_path} --lora_weights {bigrec_train_dir}",
+                    "cmd": f"RESULT_DIR={bigrec_infer_dir} ../../cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data train.json --correction ci --resource {sasrec_res_path} --lora_weights {bigrec_train_dir}",
                     "deps": [to_dvc_path(bigrec_train_dir), to_dvc_path(sasrec_dir), to_dvc_path("cmd/run_bigrec_inference_vllm.sh")],
                     "outs": [to_dvc_path(f"{bigrec_infer_dir}/train_epoch_best.json")], # Script outputs .json
                     "wdir": "../.."
@@ -129,7 +129,7 @@ def generate_pipeline(csv_path):
             
             if dllm2rec_stage_name not in dvc_stages:
                 dvc_stages[dllm2rec_stage_name] = {
-                    "cmd": f"OUTPUT_DIR={dllm2rec_dir} RANKING_PATH={ranking_path} CONFIDENCE_PATH={confidence_path} EMBEDDING_PATH={embedding_path} ./cmd/run_dllm2rec_train.sh {dataset} SASRec {gpu_id} {ed_weight} {lam}",
+                    "cmd": f"OUTPUT_DIR={dllm2rec_dir} RANKING_PATH={ranking_path} CONFIDENCE_PATH={confidence_path} EMBEDDING_PATH={embedding_path} ../../cmd/run_dllm2rec_train.sh {dataset} SASRec {gpu_id} {ed_weight} {lam}",
                     "deps": [to_dvc_path(ranking_path), to_dvc_path(confidence_path), to_dvc_path("cmd/run_dllm2rec_train.sh")],
                     "outs": [to_dvc_path(f"{dllm2rec_dir}/metrics.json")],
                     "wdir": "../.."
