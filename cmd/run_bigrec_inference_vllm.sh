@@ -61,6 +61,7 @@ while [[ "$#" -gt 0 ]]; do
         --use_embedding_model) USE_EMBEDDING_MODEL="true" ;;
         --correction) CORRECTION_MODE="$2"; shift ;;
         --resource) CORRECTION_RESOURCE="$2"; shift ;;
+        --lora_weights) LORA_WEIGHTS="$2"; shift ;;
         --gamma) MANUAL_GAMMA="$2"; shift ;;
         -h|--help) usage ;;
         *) echo "Unknown parameter passed: $1"; usage ;;
