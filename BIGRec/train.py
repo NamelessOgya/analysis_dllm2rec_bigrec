@@ -197,9 +197,9 @@ def train(
     for i in range(len(train_data_list)):
         train_data_list[i]["train"] = train_data_list[i]["train"].shuffle(seed=seed).select(range(sample)) if sample > -1 else train_data_list[i]["train"].shuffle(seed=seed)
         train_data_list[i]["train"] = train_data_list[i]["train"].shuffle(seed=seed)
-        train_data_list[i] = train_data_list[i].map(lambda x: generate_and_tokenize_prompt(x))
+        train_data_list[i] = train_data_list[i].map(lambda x: generate_and_tokenize_prompt(x), load_from_cache_file=False)
     for i in range(len(val_data_list)):
-        val_data_list[i] = val_data_list[i].map(lambda x: generate_and_tokenize_prompt(x))
+        val_data_list[i] = val_data_list[i].map(lambda x: generate_and_tokenize_prompt(x), load_from_cache_file=False)
     train_data = concatenate_datasets([_["train"] for _ in train_data_list])
     val_data = concatenate_datasets([_["train"] for _ in val_data_list])
 

@@ -194,21 +194,20 @@ fi
 EMBEDDING_DIR="BIGRec/data/$DATASET/model_embeddings"
 EMBEDDING_FILE="$EMBEDDING_DIR/${SAFE_EVAL_MODEL_NAME}.pt"
 
+# Force generation of item embeddings to include in timing
+echo "Generating item embeddings..."
+export CUDA_VISIBLE_DEVICES=$GPU_ID
+python BIGRec/data/generate_embeddings.py \
+    --dataset "$DATASET" \
+    --base_model "$EVAL_MODEL" \
+    --output_path "$EMBEDDING_FILE" \
+    $EXTRA_EMBED_ARGS
+
 if [ ! -f "$EMBEDDING_FILE" ]; then
-    echo "Generating item embeddings..."
-    export CUDA_VISIBLE_DEVICES=$GPU_ID
-    python BIGRec/data/generate_embeddings.py \
-        --dataset "$DATASET" \
-        --base_model "$EVAL_MODEL" \
-        --output_path "$EMBEDDING_FILE" \
-        $EXTRA_EMBED_ARGS
-    
-    if [ ! -f "$EMBEDDING_FILE" ]; then
-        echo "Error: Failed to generate item embeddings."
-        exit 1
-    fi
-    echo "Item embeddings generated successfully."
+    echo "Error: Failed to generate item embeddings."
+    exit 1
 fi
+echo "Item embeddings generated successfully."
 
 # Run inference with vLLM
 # Run inference with vLLM

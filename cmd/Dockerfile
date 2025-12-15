@@ -21,6 +21,9 @@ COPY requirements.txt .
 # Install python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Disable DVC Analytics
+ENV DVC_NO_ANALYTICS=true
+
 # Set python path
 ENV PYTHONPATH=/workspace
 
