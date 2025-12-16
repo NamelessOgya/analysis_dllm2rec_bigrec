@@ -194,7 +194,7 @@ elif args.validation_file:
     elif args.ci_score_path:
         val_pt_path = os.path.join(args.ci_score_path, "val.pt")
         if not os.path.exists(val_pt_path):
-             print(f"WARNING: val.pt not found at {val_pt_path}. Skipping CI tuning.")
+             raise FileNotFoundError(f"Error: val.pt not found at {val_pt_path}. CI tuning cannot proceed.")
         else:
             print("DEBUG: Tuning CI Gamma using validation set...")
             # Load validation scores
@@ -470,9 +470,7 @@ for p in path:
                       current_uid2idx = train_uid2idx
                       print(f"DEBUG: Using Train CI for {p}")
                   else:
-                      print(f"WARNING: Train CI requested for {p} (is_train=True) but train.pt/uids not loaded (ci_score_train={ci_score_train is not None}, train_uid2idx={train_uid2idx is not None}).")
-                      current_ci_score = None
-                      current_uid2idx = None
+                      raise ValueError(f"Error: Train CI requested for {p} (is_train=True) but train.pt/uids not loaded (ci_score_train={ci_score_train is not None}, train_uid2idx={train_uid2idx is not None}). Check {args.ci_score_path}")
              else:
                   # Use Test CI
                   if ci_score_test is not None:
@@ -480,9 +478,7 @@ for p in path:
                       current_uid2idx = test_uid2idx
                       print(f"DEBUG: Using Test CI for {p}")
                   else:
-                      print(f"WARNING: Test CI requested (default) for {p} but test.pt not loaded.")
-                      current_ci_score = None
-                      current_uid2idx = None
+                      raise ValueError(f"Error: Test CI requested for {p} but test.pt not loaded. Check {args.ci_score_path}")
 
              if current_uid2idx is not None:
                  # Strict Alignment Check

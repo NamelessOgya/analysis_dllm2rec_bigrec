@@ -35,7 +35,7 @@ if [ -e "${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_tr
     echo "Skipping BIGRec Inference (Output exists: ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_0_alpha_0.5/train_epoch_best.json)"
 else
     echo "Running BIGRec Inference..."
-    RESULT_DIR=${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_0_alpha_0.5 ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 0 --model google/gemma-2B-it --seed 0 --sample -1 --checkpoint best --test_data train.json --correction ci --resource ${REPO_ROOT}/experiments/game_bigrec/sasrec/seed_0/alpha_0.5 --lora_weights ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_0_alpha_0.5
+    RESULT_DIR=${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_0_alpha_0.5 ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 0 --model google/gemma-2B-it --seed 0 --sample -1 --checkpoint best --test_data all --correction ci --resource ${REPO_ROOT}/experiments/game_bigrec/sasrec/seed_0/alpha_0.5 --lora_weights ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_0_alpha_0.5
 fi
 
 # --- Step 5: DLLM2Rec Train ---
@@ -78,7 +78,7 @@ if [ -e "${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_tr
     echo "Skipping BIGRec Inference (Output exists: ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_2_alpha_0.5/train_epoch_best.json)"
 else
     echo "Running BIGRec Inference..."
-    RESULT_DIR=${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_2_alpha_0.5 ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 0 --model google/gemma-2B-it --seed 2 --sample -1 --checkpoint best --test_data train.json --correction ci --resource ${REPO_ROOT}/experiments/game_bigrec/sasrec/seed_2/alpha_0.5 --lora_weights ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_2_alpha_0.5
+    RESULT_DIR=${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_1000_0.5_seed_2_alpha_0.5 ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 0 --model google/gemma-2B-it --seed 2 --sample -1 --checkpoint best --test_data all --correction ci --resource ${REPO_ROOT}/experiments/game_bigrec/sasrec/seed_2/alpha_0.5 --lora_weights ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_1000_0.5_seed_2_alpha_0.5
 fi
 
 # --- Step 5: DLLM2Rec Train ---
@@ -121,7 +121,7 @@ if [ -e "${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_tr
     echo "Skipping BIGRec Inference (Output exists: ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_100_0.5_seed_0_alpha_0.5/train_epoch_best.json)"
 else
     echo "Running BIGRec Inference..."
-    RESULT_DIR=${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_100_0.5_seed_0_alpha_0.5 ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 0 --model google/gemma-2B-it --seed 0 --sample -1 --checkpoint best --test_data train.json --correction ci --resource ${REPO_ROOT}/experiments/game_bigrec/sasrec/seed_0/alpha_0.5 --lora_weights ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_0_alpha_0.5
+    RESULT_DIR=${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_100_0.5_seed_0_alpha_0.5 ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 0 --model google/gemma-2B-it --seed 0 --sample -1 --checkpoint best --test_data all --correction ci --resource ${REPO_ROOT}/experiments/game_bigrec/sasrec/seed_0/alpha_0.5 --lora_weights ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_0_alpha_0.5
 fi
 
 # --- Step 5: DLLM2Rec Train ---
@@ -164,7 +164,7 @@ if [ -e "${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_tr
     echo "Skipping BIGRec Inference (Output exists: ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_100_0.5_seed_2_alpha_0.5/train_epoch_best.json)"
 else
     echo "Running BIGRec Inference..."
-    RESULT_DIR=${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_100_0.5_seed_2_alpha_0.5 ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 0 --model google/gemma-2B-it --seed 2 --sample -1 --checkpoint best --test_data train.json --correction ci --resource ${REPO_ROOT}/experiments/game_bigrec/sasrec/seed_2/alpha_0.5 --lora_weights ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_2_alpha_0.5
+    RESULT_DIR=${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_infer_train/random_100_0.5_seed_2_alpha_0.5 ./cmd/run_bigrec_inference_vllm.sh --dataset game_bigrec --gpu 0 --model google/gemma-2B-it --seed 2 --sample -1 --checkpoint best --test_data all --correction ci --resource ${REPO_ROOT}/experiments/game_bigrec/sasrec/seed_2/alpha_0.5 --lora_weights ${REPO_ROOT}/experiments/game_bigrec/google_gemma-2B-it/bigrec_train/random_100_0.5_seed_2_alpha_0.5
 fi
 
 # --- Step 5: DLLM2Rec Train ---
