@@ -321,8 +321,13 @@ def myevaluate(model, test_data, device, llm_all_emb=None, batch_size=256):
     print('#' * 120)
     
     # Return accumulated predictions
-    # Note: original code returned `prediction[:, :-1]`. We must do same.
-    return full_prediction[:, :-1], hr_list, ndcg_list, uids_list
+    # Note: original code returned `prediction[:, :-1]`. 
+    # FIX: SASRec Item IDs are 1-based (1..ItemNum). 0 is padding.
+    # BIGRec IDs are 0-based (0..ItemNum-1).
+    # We want column 1 to align with BIGRec Item 0. 
+    # So we should return prediction[:, 1:] covering 1 to ItemNum.
+    # Prediction shape is [B, ItemNum+1].
+    return full_prediction[:, 1:], hr_list, ndcg_list, uids_list
 
 def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256):
     print("Evaluating Training Data for Export...")
@@ -397,7 +402,8 @@ def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256
             preds = model.forward(seq_tensor, len_tensor, llm_emb) # [B, ItemNum]
             
             # Slice padding (last column)
-            preds = preds[:, :-1]
+            # FIX: We want columns [1:] (Items 1..ItemNum)
+            preds = preds[:, 1:]
             
             # Append (convert to half to save memory: 4GB -> 2GB approx)
             all_preds.append(preds.half().cpu())

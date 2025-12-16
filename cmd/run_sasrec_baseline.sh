@@ -50,7 +50,7 @@ echo "Using output directory: $OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 EXTRA_ARGS="--output_dir $OUTPUT_DIR"
 
-python main.py \
+python3 main.py \
     --data $DATASET \
     --model_name SASRec \
     --epoch $EPOCH \
