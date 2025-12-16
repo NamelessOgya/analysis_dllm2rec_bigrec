@@ -39,15 +39,10 @@ python process.py
 
 echo "Data preprocessing completed for $DATASET"
 
-# Copy data to DLLM2Rec directory for training
-DLLM2REC_DATA_DIR="../../../DLLM2Rec/data/$DATASET"
-echo "Copying data to DLLM2Rec directory: $DLLM2REC_DATA_DIR"
-mkdir -p "$DLLM2REC_DATA_DIR"
+# Generate DLLM2Rec data using the robust conversion script
+echo "Generating aligned data for DLLM2Rec..."
+# We are in BIGRec/data/game_bigrec/, need to go back to root to run the script via relative path or absolute
+cd "../../.."
+python3 DLLM2Rec/convert_bigrec_data.py --dataset $DATASET
 
-cp train_data.df "$DLLM2REC_DATA_DIR/"
-cp val_data.csv "$DLLM2REC_DATA_DIR/"
-cp test_data.csv "$DLLM2REC_DATA_DIR/"
-cp data_statis.df "$DLLM2REC_DATA_DIR/"
-cp id2name.txt "$DLLM2REC_DATA_DIR/"
-
-echo "Data transfer to DLLM2Rec completed."
+echo "Data preprocessing and conversion completed."

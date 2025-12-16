@@ -60,55 +60,73 @@ def extract_ids(df):
             
     return target_col, hist_col
 
-print("Extracting IDs from Train...")
-t_col, h_col = extract_ids(train_df)
-print("Extracting IDs from Valid...")
-extract_ids(valid_df)
-print("Extracting IDs from Test...")
-extract_ids(test_df)
+# Load id2name.txt just to get max item count and verify universe
+id2name_path = os.path.join(BIGREC_DATA_DIR, 'id2name.txt')
+print(f"Loading item count from {id2name_path}...")
+item_count = 0
+with open(id2name_path, 'r') as f:
+    for line in f:
+        item_count += 1
+print(f"Total items in id2name.txt: {item_count}")
 
-# Create mapping: Original ID (str) -> Mapped ID (int, 1-based)
-sorted_ids = sorted(list(all_movie_ids))
-id_map = {original_id: i + 1 for i, original_id in enumerate(sorted_ids)}
-item_num = len(id_map)
+# SASRec needs 1-based indexing (0 is padding).
+# BIGRec uses 0-based indexing (0 to item_count-1).
+# Mapping: SASRec_ID = BIGRec_ID + 1
 
-print(f"Total items: {item_num}")
+item_num = item_count
 
 def convert_row(row, target_col, hist_col):
     # History
+    # history_ids_raw is list of integers in string format e.g. "[10804, 15747]"
+    # or list of strings if mixed? 
+    # train.csv sample: "[10804, 15747, ...]" -> looks like ints.
     history_ids_raw = eval(str(row[hist_col]))
-    seq = [id_map[str(mid)] for mid in history_ids_raw]
+    
+    # We assume history_ids_raw are already BIGRec IDs (integers).
+    # Map to 1-based
+    seq = [int(mid) + 1 for mid in history_ids_raw]
     
     # Target
-    target = id_map[str(row[target_col])]
+    # target_col is 'item_id' (integer)
+    target = int(row[target_col]) + 1
     
     return seq, len(seq), target
 
 def process_df(df, is_train=False):
-    target_col = 'movie_id' if 'movie_id' in df.columns else 'item_id'
-    hist_col = 'history_movie_id' if 'history_movie_id' in df.columns else 'history_item_id'
+    # Determine columns. 'item_id' is standard in game_bigrec.
+    target_col = 'item_id'
+    if target_col not in df.columns:
+        # Fallback if inconsistent
+        target_col = 'movie_id' if 'movie_id' in df.columns else 'item_id'
+    
+    hist_col = 'history_item_id'
+    if hist_col not in df.columns:
+         hist_col = 'history_movie_id' if 'history_movie_id' in df.columns else 'history_item_id'
     
     data_list = []
     for _, row in df.iterrows():
-        seq, len_seq, target = convert_row(row, target_col, hist_col)
-        
-        item = {
-            'seq': seq,
-            'len_seq': len_seq,
-            'next': target
-        }
-        
-        # Capture UID
-        if 'uid' in row:
-             item['uid'] = int(row['uid'])
-        elif 'user_id' in row:
-             # Fallback if uid not present? But header had 'uid'.
-             try:
-                 item['uid'] = int(row['user_id'])
-             except:
-                 item['uid'] = -1
-        
-        data_list.append(item)
+        try:
+            seq, len_seq, target = convert_row(row, target_col, hist_col)
+            
+            item = {
+                'seq': seq,
+                'len_seq': len_seq,
+                'next': target
+            }
+            
+            # Capture UID
+            if 'uid' in row:
+                 item['uid'] = int(row['uid'])
+            elif 'user_id' in row:
+                 try:
+                     item['uid'] = int(row['user_id'])
+                 except:
+                     item['uid'] = -1
+            
+            data_list.append(item)
+        except Exception as e:
+            print(f"Error processing row: {e}")
+            continue
     
     new_df = pd.DataFrame(data_list)
     return new_df
@@ -129,24 +147,18 @@ test_converted = process_df(test_df)
 test_converted.to_csv(os.path.join(DLLM2REC_DATA_DIR, 'test_data.csv'), index=False)
 
 # Create data_statis.df
-seq_size = 200 # SASRec default usually 200? BIGRec prompt len 10. 
-# Check run_sasrec_baseline.sh args? max_len=200.
-# So statis should report what?
-# Actually run_sasrec_baseline says: ./cmd/run_sasrec_baseline.sh game_bigrec 1 200 ...
-# The 200 is max_len.
-# statis_df seq_size should probably match max_len or be sufficient.
-# Let's assume 200 if not specified.
+seq_size = 200 
 statis_data = {
-    'seq_size': [200], 
+    'seq_size': [seq_size], 
     'item_num': [item_num]
 }
 statis_df = pd.DataFrame(statis_data)
 statis_df.to_pickle(os.path.join(DLLM2REC_DATA_DIR, 'data_statis.df'))
 
-# Save id_map check
+# Save item_map check (Identity mapping shifted by 1)
 with open(os.path.join(DLLM2REC_DATA_DIR, 'item_map.txt'), 'w') as f:
-    for k, v in id_map.items():
-        f.write(f"{k}\t{v}\n")
+    f.write(f"Identity Mapping (BIGRec ID N -> SASRec ID N+1)\n")
+    f.write(f"Total Items: {item_num}\n")
 
 print("Conversion complete.")
 print(f"Files saved to {DLLM2REC_DATA_DIR}")
