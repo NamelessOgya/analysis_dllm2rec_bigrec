@@ -568,7 +568,7 @@ if __name__ == '__main__':
             # But earlier code used item_num+2 for safety. Let's stick with item_num+2 masking.
             zeros_tensor = torch.zeros((real_batch_size, item_num + 2), device=device)
             # scatter padding (index item_num) and targets
-            zeros_tensor[torch.arange(real_batch_size).unsqueeze(1).repeat(1, 10), seq] = 1
+            zeros_tensor[torch.arange(real_batch_size).unsqueeze(1).repeat(1, seq.size(1)), seq] = 1
             zeros_tensor[torch.arange(real_batch_size), target] = 1
             
             # Mask index item_num (Padding) to prevent sampling it

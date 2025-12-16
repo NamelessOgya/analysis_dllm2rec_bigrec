@@ -70,7 +70,7 @@ print(f"Total items in id2name.txt: {item_count}")
 # Mapping: SASRec_ID = BIGRec_ID + 1
 
 item_num = item_count
-MAX_SEQ_LEN = 200
+MAX_SEQ_LEN = 10 # Original value
 
 def convert_row(row, target_col, hist_col):
     # History
@@ -127,7 +127,7 @@ def convert_row(row, target_col, hist_col):
     # target_col is 'item_id' (integer)
     target = int(row[target_col]) + 1
     
-    return seq, len(seq), target # len(seq) returned is post-padding (200) or original? 
+    return seq, MAX_SEQ_LEN, target # len(seq) returned is post-padding (200) or original? 
     # usually original length is useful for masking. 
     # But main.py SASRec uses fixed pos embedding. 
     # Let's return the padded list. 

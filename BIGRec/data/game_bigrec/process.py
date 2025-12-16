@@ -102,8 +102,10 @@ def create_interactions(users, item2id, id_title):
         users[key]['ratings'] = ratings
         users[key]['timestamps'] = timestamps
         
+        # History window size 10 (Original)
         for i in range(min(10, len(items) - 1), len(items)):
             st = max(i - 10, 0)
+            
             interactions.append([
                 key, 
                 users[key]['items'][st: i], 
@@ -155,63 +157,8 @@ def save_csv(interactions):
     return train_data, valid_data, test_data
 
 def save_dllm2rec_data(train, valid, test, item_num):
-    print("Generating DLLM2Rec data...")
-    
-    def process_split(data):
-        # data is list of [key, history_items, target_item, history_ids, target_id, ..., timestamp, uid]
-        # index 3: history_ids (0-based list)
-        # index 4: target_id (0-based int)
-        # index 10: uid
-        processed = []
-        for row in data:
-            history_ids = row[3]
-            target_id = row[4]
-            uid = row[10]
-            
-            # 0-based indexing for DLLM2Rec (Aligning with BIGRec)
-            # Items 0..item_num-1. Padding = item_num
-            seq = [x for x in history_ids] 
-            next_item = target_id
-            len_seq = len(seq)
-            
-            # Pad sequence to length 10
-            # SASRec uses item_num as padding index (if configured correctly)
-            pad_token = item_num 
-            if len_seq < 10:
-                seq = seq + [pad_token] * (10 - len_seq)
-            else:
-                seq = seq[-10:]
-            
-            processed.append({
-                'seq': seq,
-                'len_seq': len_seq,
-                'next': next_item,
-                'uid': uid
-            })
-        return pd.DataFrame(processed)
-
-    train_df = process_split(train)
-    valid_df = process_split(valid)
-    test_df = process_split(test)
-    
-    # Save train as pickle
-    train_df.to_pickle('./train_data.df')
-    
-    # Save val/test as CSV
-    # Note: Lists in CSVs need to be stringified to match typical pandas to_csv behavior for objects,
-    # or just saving normally works but they become string representations "[1, 2, 3]".
-    # The inspection showed they are strings in the CSV.
-    valid_df.to_csv('./val_data.csv', index=False)
-    test_df.to_csv('./test_data.csv', index=False)
-    
-    # Save statistics
-    # seq_size is window size (10)
-    # item_num is max_id + 1 if 0-based? No, item_num is COUNT of items.
-    # IDs 0..item_num-1.
-    statis = pd.DataFrame([{'seq_size': 10, 'item_num': item_num}])
-    statis.to_pickle('./data_statis.df')
-    
-    print("Saved DLLM2Rec data to .")
+    # This legacy function is now superseded by the external convert_bigrec_data.py script
+    pass
 
 def csv_to_json(input_path, output_path, sample=False):
     print(f"Converting {input_path} to {output_path}...")
