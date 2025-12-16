@@ -273,6 +273,12 @@ if [ -n "$VALID_FILE" ]; then
     echo "Using Validation File for Grid Search: $VALID_FILE"
     EVAL_ARGS="$EVAL_ARGS --validation_file $VALID_FILE"
 else
+    # Critical check for CI mode
+    if [ "$CORRECTION_MODE" == "ci" ] && [ -z "$MANUAL_GAMMA" ]; then
+        echo "Error: CI Correction requires validation file for Gamma Grid Search, but none found in $RESULT_DIR."
+        echo "Please ensure validation data is generated (e.g. use --test_data all)."
+        exit 1
+    fi
     echo "WARNING: No validation file found in $RESULT_DIR. Grid search may fail if enabled."
 fi
 
