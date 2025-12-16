@@ -116,7 +116,7 @@ def generate_bash_pipeline(csv_path):
                 # Output file needed for next step
                 bigrec_infer_out = f"{bigrec_infer_dir}/train_epoch_best.json"
                 
-                bigrec_infer_cmd = f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data train.json --correction ci --resource {sasrec_res_path} --lora_weights {bigrec_train_dir}"
+                bigrec_infer_cmd = f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data all --correction ci --resource {sasrec_res_path} --lora_weights {bigrec_train_dir}"
 
                 f.write(f"\n# --- Step 4: BIGRec Inference ---\n")
                 f.write(f"if [ -e \"{bigrec_infer_out}\" ]; then\n")
