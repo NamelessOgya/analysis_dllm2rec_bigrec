@@ -453,10 +453,10 @@ for p in path:
         
         # Apply CI Adjustment if enabled (Mutually Exclusive handled before, but safe check)
         if args.ci_score_path:
-             # Determine which CI scores to use based on filename
-             # If filename contains 'val' or 'valid', use Validation CI
-             is_validation = 'val' in p.lower() or 'valid' in p.lower()
-             is_train = 'train' in p.lower()
+             # Determine which CI scores to use based on filename (basename only) to avoid directory name collision
+             filename = os.path.basename(p).lower()
+             is_validation = 'val' in filename or 'valid' in filename
+             is_train = 'train' in filename
              
              print(f"DEBUG: Checking file classification for '{p}': is_train={is_train}, is_validation={is_validation}")
 

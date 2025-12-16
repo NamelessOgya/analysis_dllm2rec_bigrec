@@ -168,6 +168,10 @@ def process_df(df, is_train=False):
          hist_col = 'history_movie_id' if 'history_movie_id' in df.columns else 'history_item_id'
     
     data_list = []
+    
+    # Check if UID exists effectively
+    has_uid = 'uid' in df.columns
+    
     for _, row in df.iterrows():
         try:
             seq, len_seq, target = convert_row(row, target_col, hist_col)
@@ -179,13 +183,17 @@ def process_df(df, is_train=False):
             }
             
             # Capture UID
-            if 'uid' in row:
+            if has_uid:
                  item['uid'] = int(row['uid'])
             elif 'user_id' in row:
+                 # Fallback to user_id parsing if integer?
                  try:
                      item['uid'] = int(row['user_id'])
                  except:
                      item['uid'] = -1
+            else:
+                 # Critical: No UID found
+                 item['uid'] = -1
             
             data_list.append(item)
         except Exception as e:
@@ -193,6 +201,8 @@ def process_df(df, is_train=False):
             continue
     
     new_df = pd.DataFrame(data_list)
+    if 'uid' not in new_df.columns:
+         print(f"CRITICAL ERROR: Generated DataFrame missing 'uid' column! Sample data: {data_list[:1]}")
     return new_df
 
 print("Processing Train...")
