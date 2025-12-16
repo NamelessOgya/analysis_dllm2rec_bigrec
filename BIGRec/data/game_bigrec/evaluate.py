@@ -458,17 +458,17 @@ for p in path:
              is_validation = 'val' in filename or 'valid' in filename
              is_train = 'train' in filename
              
-             print(f"DEBUG: Checking file classification for '{p}': is_train={is_train}, is_validation={is_validation}")
+             # print(f"DEBUG: Checking file classification for '{p}': is_train={is_train}, is_validation={is_validation}")
 
              if is_validation:
                   current_ci_score = ci_norm_val
                   current_uid2idx = val_uid2idx
-                  print(f"DEBUG: Using Validation CI for {p}")
+                  # print(f"DEBUG: Using Validation CI for {p}")
              elif is_train:
                   if ci_score_train is not None and train_uid2idx is not None:
                       current_ci_score = ci_score_train
                       current_uid2idx = train_uid2idx
-                      print(f"DEBUG: Using Train CI for {p}")
+                      # print(f"DEBUG: Using Train CI for {p}")
                   else:
                       raise ValueError(f"Error: Train CI requested for {p} (is_train=True) but train.pt/uids not loaded (ci_score_train={ci_score_train is not None}, train_uid2idx={train_uid2idx is not None}). Check {args.ci_score_path}")
              else:
@@ -476,9 +476,11 @@ for p in path:
                   if ci_score_test is not None:
                       current_ci_score = ci_score_test
                       current_uid2idx = test_uid2idx
-                      print(f"DEBUG: Using Test CI for {p}")
+                      # print(f"DEBUG: Using Test CI for {p}")
                   else:
-                      raise ValueError(f"Error: Test CI requested for {p} but test.pt not loaded. Check {args.ci_score_path}")
+                      print(f"WARNING: Test CI requested for {p} but test.pt not loaded. Skipping CI adjustment.")
+                      current_ci_score = None
+                      current_uid2idx = None
 
              if current_uid2idx is not None:
                  # Strict Alignment Check
