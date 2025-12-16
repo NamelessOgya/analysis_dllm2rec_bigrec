@@ -208,12 +208,12 @@ class SASRec(nn.Module):
         return supervised_output
     
 
-def myevaluate(model, test_data, device, llm_all_emb=None):
-    states = []
-    len_states = []
-    actions = []
-    uids = []
-    total_purchase = 0
+def myevaluate(model, test_data, device, llm_all_emb=None, batch_size=256):
+    states_list = []
+    len_states_list = []
+    actions_list = []
+    uids_list = []
+    
     import csv
     with open(test_data, 'r') as file:
         reader = csv.DictReader(file)
@@ -221,35 +221,73 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
             seq = eval(row['seq'])
             len_seq = int(row['len_seq'])
             next_item = float(row['next'])
-            states.append(seq)
-            len_states.append(len_seq)
-            actions.append(next_item)
+            states_list.append(seq)
+            len_states_list.append(len_seq)
+            actions_list.append(next_item)
             if 'uid' in row:
-                uids.append(int(row['uid']))
-            total_purchase += 1
+                uids_list.append(int(row['uid']))
 
-    states = np.array(states)
-    states = states.astype(np.int64)
-    states = torch.LongTensor(states)
-    states = states.to(device)
-
-    if llm_all_emb != None:
-        seq = states
-        llm_dim = llm_all_emb.shape[1]
-        llm_emb = torch.zeros(seq.size(0), seq.size(1), llm_dim, dtype=llm_all_emb.dtype, device=device)
-        mask = seq < llm_all_emb.size(0)
-        llm_emb[mask] = llm_all_emb[seq[mask]]
-        llm_emb = llm_emb.to(device)
-    else:
-        llm_emb = None
-
-    # model.forward
-    prediction = model.forward(states, np.array(len_states),llm_emb) # [num_test,num_item]
-    sorted_list = torch.argsort(prediction.detach()).cpu().numpy()
+    total_purchase = len(states_list)
+    num_batches = (total_purchase + batch_size - 1) // batch_size
+    
+    all_sorted_list = []
+    all_predictions = []
+    
+    model.eval()
+    
+    with torch.no_grad():
+        for i in range(num_batches):
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, total_purchase)
+            
+            batch_states = states_list[start_idx:end_idx]
+            batch_len = len_states_list[start_idx:end_idx]
+            
+            # Create batch tensors
+            states = np.array(batch_states)
+            states = states.astype(np.int64)
+            states = torch.LongTensor(states).to(device)
+            
+            if llm_all_emb != None:
+                seq_tensor = states
+                llm_dim = llm_all_emb.shape[1]
+                llm_emb = torch.zeros(seq_tensor.size(0), seq_tensor.size(1), llm_dim, dtype=llm_all_emb.dtype, device=device)
+                
+                # Careful with mask: llm_all_emb has size [ItemNum, Dim]. 
+                # IDs in seq are SASRec IDs (1-based?). 
+                # If using Distillation, we need to map or ensure IDs are valid.
+                # Assuming convert_bigrec_data.py handles alignment.
+                # Just strict size check:
+                mask = seq_tensor < llm_all_emb.size(0)
+                llm_emb[mask] = llm_all_emb[seq_tensor[mask]]
+                llm_emb = llm_emb.to(device)
+            else:
+                llm_emb = None
+            
+            # Forward
+            # Note: Main loop uses torch.LongTensor for len_states, strictly.
+            # But here we used np.array(len_states) previously. 
+            # Let's use np.array as in original myevaluate to minimize risk, 
+            # unless we know SASRec matches main loop. 
+            # Original code was: model.forward(states, np.array(len_states), llm_emb)
+            # So we keep np.array for batch_len.
+            prediction = model.forward(states, np.array(batch_len), llm_emb) 
+            
+            # Sort TopK
+            # We only need Top 50 (max(topk)) for metrics, but we need full predictions for some reason?
+            # Return value is `prediction[:, :-1]`.
+            # For metrics:
+            sorted_batch = torch.argsort(prediction.detach()).cpu().numpy()
+            all_sorted_list.append(sorted_batch)
+            all_predictions.append(prediction.cpu())
+            
+    # Concatenate results
+    sorted_list = np.concatenate(all_sorted_list, axis=0)
+    full_prediction = torch.cat(all_predictions, dim=0)
 
     hit_purchase = [0] * len(topk)
     ndcg_purchase = [0] * len(topk)
-    calculate_hit(sorted_list=sorted_list, topk=topk, true_items=actions, hit_purchase=hit_purchase,
+    calculate_hit(sorted_list=sorted_list, topk=topk, true_items=actions_list, hit_purchase=hit_purchase,
                   ndcg_purchase=ndcg_purchase)
 
     print('#' * 120)
@@ -281,7 +319,10 @@ def myevaluate(model, test_data, device, llm_all_emb=None):
     print('#' * 120)
     print(values_str)
     print('#' * 120)
-    return prediction[:, :-1], hr_list, ndcg_list, uids
+    
+    # Return accumulated predictions
+    # Note: original code returned `prediction[:, :-1]`. We must do same.
+    return full_prediction[:, :-1], hr_list, ndcg_list, uids_list
 
 def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256):
     print("Evaluating Training Data for Export...")
