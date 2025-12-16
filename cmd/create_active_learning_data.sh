@@ -61,6 +61,9 @@ if [ -z "$OUTPUT_JSON" ]; then
     exit 1
 fi
 
+# Ensure output directory exists based on OUTPUT_JSON path
+mkdir -p "$(dirname "$OUTPUT_JSON")"
+
 # Check if data exists
 if [ ! -f "$INPUT_JSON" ]; then
     echo "Error: Input JSON not found at $INPUT_JSON"

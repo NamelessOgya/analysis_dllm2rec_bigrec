@@ -110,9 +110,7 @@ ELAPSED_MIN=$(python3 -c "print($ELAPSED / 60)")
 
 echo "Distillation process time: $ELAPSED seconds ($ELAPSED_MIN minutes)"
 
-# Create output directory if not exists (DLLM2Rec doesn't seem to have a standard output dir structure in this script)
-OUTPUT_DIR="output/$DATASET"
-mkdir -p "$OUTPUT_DIR"
+# Save execution time to JSON (using the main OUTPUT_DIR)
 
 # Save execution time to JSON
 python -c "import json; import os; 

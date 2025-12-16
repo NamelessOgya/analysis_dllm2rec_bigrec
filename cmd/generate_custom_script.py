@@ -31,6 +31,8 @@ def generate_bash_pipeline(csv_path):
             f.write("# Auto-generated pipeline script. Skips steps if output exists.\n")
             f.write("set -e\n\n")
             
+            f.write(f"REPO_ROOT=$(pwd)\n")
+            
             for idx, row in group.iterrows():
                 # Extract parameters
                 dataset = str(row['dataset_name'])
@@ -50,7 +52,7 @@ def generate_bash_pipeline(csv_path):
                 safe_base_model = base_model.replace('/', '_')
                 alpha_str = str(alpha)
                 
-                exp_root = f"experiments/{dataset}"
+                exp_root = f"${{REPO_ROOT}}/experiments/{dataset}"
 
                 f.write(f"echo \"----------------------------------------------------------------\"\n")
                 f.write(f"echo 'Starting experiment for {dataset} seed={seed} alpha={alpha} strategy={strategy} ...'\n")
