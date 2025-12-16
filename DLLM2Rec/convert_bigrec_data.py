@@ -12,15 +12,7 @@ args = parse.parse_args()
 
 DATASET = args.dataset
 BIGREC_DATA_DIR = f'BIGRec/data/{DATASET}'
-DLLM2REC_DATA_DIR = f'DLLM2Rec/tocf/{DATASET}' # Updated to match where main.py expects it (based on run_dllm2rec_train.sh defaults usually, or verify?) 
-# run_dllm2rec_train.sh uses: DLLM2Rec/tocf/{args.data}/ if not provided. 
-# But wait, earlier script used DLLM2Rec/data/movie. 
-# main.py defaults to `tocf/{args.data}` if embedding_path not provided?
-# No, main.py data loading:
-# args.data_path default is 'tocf/'. 
-# Then `data_path = args.data_path + args.data`.
-# So if dataset is 'game_bigrec', path is `tocf/game_bigrec`.
-# Let's use `DLLM2Rec/tocf/{DATASET}`.
+DLLM2REC_DATA_DIR = f'DLLM2Rec/data/{DATASET}' # Reverted to match main.py expectation (line 442)
 
 # Ensure output directory exists
 os.makedirs(DLLM2REC_DATA_DIR, exist_ok=True)
