@@ -65,24 +65,96 @@ print(f"Total items in id2name.txt: {item_count}")
 # BIGRec uses 0-based indexing (0 to item_count-1).
 # Mapping: SASRec_ID = BIGRec_ID + 1
 
+# SASRec needs 1-based indexing (0 is padding).
+# BIGRec uses 0-based indexing (0 to item_count-1).
+# Mapping: SASRec_ID = BIGRec_ID + 1
+
 item_num = item_count
+MAX_SEQ_LEN = 200
 
 def convert_row(row, target_col, hist_col):
     # History
     # history_ids_raw is list of integers in string format e.g. "[10804, 15747]"
-    # or list of strings if mixed? 
-    # train.csv sample: "[10804, 15747, ...]" -> looks like ints.
     history_ids_raw = eval(str(row[hist_col]))
     
-    # We assume history_ids_raw are already BIGRec IDs (integers).
     # Map to 1-based
     seq = [int(mid) + 1 for mid in history_ids_raw]
+    
+    # Truncate if too long (take last MAX_SEQ_LEN)
+    if len(seq) > MAX_SEQ_LEN:
+         seq = seq[-MAX_SEQ_LEN:]
+         
+    # Pad if too short (Left Padding to keep generic position alignment? 
+    # SASRec sets position embedding based on 0..len-1 usually if not managing explicitly?
+    # Actually main.py SASRec uses:
+    # positions = torch.arange(len_states).to(device)
+    # inputs_emb += self.positional_embeddings(...)
+    # Wait, main.py SASRec forward (line 193):
+    # inputs_emb += self.positional_embeddings(torch.arange(self.state_size).to(self.device))
+    # It adds position embedding 0..max_len to columns 0..max_len.
+    # So if we left pad [0, 0, item1, item2], item2 gets position 3 (if len 4).
+    # If we right pad [item1, item2, 0, 0], item2 gets position 1.
+    # Sequential recommendation usually models "sequence of events".
+    # Left padding means the "sequence finishes at the end of the window".
+    # Right padding means "sequence starts at 0".
+    # main.py passes `len_states` to model. 
+    # But SASRec in main.py uses `torch.arange(self.state_size)` which implies it adds positions 0..200 to the whole tensor.
+    # BUT, it creates causal masks? 
+    # line 196: mask = torch.ne(states, self.item_num).float() ... which masks padding (if padding is item_num?? No, padding is 0).
+    # wait, main.py line 569: `zeros_tensor = torch.zeros((..., item_num + 2))`
+    # line 571: sets `seq` indices to 1.
+    # line 574: `zeros_tensor[:, item_num] = 1`.
+    
+    # Let's look at `SASRec.forward` in main.py (line 188) again.
+    # `mask = torch.ne(states, self.item_num).float()`
+    # If padding is 0, and item_num is e.g. 17408. 
+    # Then mask keeps everything except 17408?
+    # This implies 17408 IS the padding index in that simplified SASRec implementation!
+    # BUT, typically 0 is padding.
+    # Let's check `convert_bigrec_data.py` padding decision.
+    # Code generally assumes 0 is padding in most repos.
+    # But main.py line 60 says `num_embeddings=item_num + 1`.
+    # And line 574 explicitly uses `item_num` as a special token for negative sampling avoidance.
+    # Let's check utility.py `pad_history` later if possible?
+    # No, I should stick to 0 as padding (standard) and Left Padding (standard for Transformer fixed pos).
+    
+    pad_len = MAX_SEQ_LEN - len(seq)
+    if pad_len > 0:
+        # Left padding with 0
+        seq = [0] * pad_len + seq
     
     # Target
     # target_col is 'item_id' (integer)
     target = int(row[target_col]) + 1
     
-    return seq, len(seq), target
+    return seq, len(seq), target # len(seq) returned is post-padding (200) or original? 
+    # usually original length is useful for masking. 
+    # But main.py SASRec uses fixed pos embedding. 
+    # Let's return the padded list. 
+    # But len_seq? main.py uses it for GRU `pack_padded_sequence`.
+    # For SASRec it seems ignored in some implementations or used for masking?
+    # main.py SASRec: `state_hidden = extract_axis_1(ff_out, len_states - 1)`
+    # It extracts the hidden state at the LAST VALID ITEM index.
+    # If Left Padded: [0, 0, 1, 2], len=2? No, len is relative to valid items?
+    # If Left Padded, the last item is at index 199 (end).
+    # If Right Padded: [1, 2, 0, 0], last item is at index 1.
+    # extract_axis_1(..., len_states - 1) implies we need the index of the last item.
+    # If Left Padding [0, 0, ..., item], the last item is ALWAYS at 199 (MAX_SEQ_LEN-1).
+    # If Right Padding [item, ..., 0, 0], the last item is at len_valid - 1.
+    
+    # CONCLUSION: SASRec in this repo probably uses Left Padding (fixed pos embedding 0..199) implies the model looks at position 199 for the prediction.
+    # BUT `extract_axis_1` using `len_states - 1` suggests VARIABLE specific position.
+    # If I use Left Padding, `len_states - 1` should be 199.
+    # If I use Right Padding, `len_states - 1` should be real_length - 1.
+    # BUT SASRec typically aligns "Next Item Prediction" to the last token.
+    # If I use Left Padding, the standardized position is the end.
+    # Let's try Left Padding and setting len_seq = MAX_SEQ_LEN.
+    # Because [0, 0, 1, 2] -> Predict 3. The info is at index 3 (if 0-based).
+    # Wait, if Left Padded, the "sequence" ends at 199.
+    # So `len_seq` should be 200.
+    
+    return seq, MAX_SEQ_LEN, target # Return padded seq and fixed max len match.
+
 
 def process_df(df, is_train=False):
     # Determine columns. 'item_id' is standard in game_bigrec.
