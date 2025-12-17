@@ -24,8 +24,8 @@ fi
 docker run -d -it \
     --name $CONTAINER_NAME \
     $GPU_FLAG \
-    --shm-size=8g \
-    --memory=16g \
+    --shm-size=64g \
+    --memory=128g \
     -v $(pwd):/workspace \
     $IMAGE_NAME
 
