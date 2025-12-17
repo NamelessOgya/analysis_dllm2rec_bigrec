@@ -671,9 +671,9 @@ if __name__ == '__main__':
             if args.lam != 0:
                 candidate = all_candidate[sample] # [1024,k]
                 candidate = candidate[:,:args.candidate_topk]
-                # FIX: BIGRec IDs are 0-based. SASRec items 0-based.
-                # No shift needed!
-                # candidate = candidate   
+                # FIX: BIGRec IDs are 0-based. SASRec items 1-based.
+                # shift needed!
+                candidate = candidate + 1   
                 # weight_rank
                 _lambda = 1
                 _K = args.candidate_topk
