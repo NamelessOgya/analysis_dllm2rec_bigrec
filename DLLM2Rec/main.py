@@ -262,7 +262,7 @@ def myevaluate(model, test_data, device, llm_all_emb=None, batch_size=256):
                 # mask = seq_tensor < llm_all_emb.size(0)
                 # llm_emb[mask] = llm_all_emb[seq_tensor[mask]]
 
-                mask = seq_tensor < seq_tensor <= llm_all_emb.size(0)
+                mask = (seq_tensor > 0) & (seq_tensor <= llm_all_emb.size(0))
                 valid_ids = seq_tensor[mask] - 1
                 llm_emb[mask] = llm_all_emb[valid_ids]
                 
@@ -644,8 +644,9 @@ if __name__ == '__main__':
             # llm_emb getting
             if llm_all_emb != None:
                 llm_emb = torch.zeros(seq.size(0), seq.size(1), llm_input_dim, dtype=llm_all_emb.dtype, device=device)
-                mask = seq < llm_all_emb.size(0)
-                llm_emb[mask] = llm_all_emb[seq[mask]]
+                mask = (seq > 0) & (seq <= llm_all_emb.size(0))
+                valid_ids = seq[mask] - 1
+                llm_emb[mask] = llm_all_emb[valid_ids]
                 llm_emb = llm_emb.to(device)  
             else:
                 llm_emb = None
