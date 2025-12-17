@@ -258,8 +258,15 @@ def myevaluate(model, test_data, device, llm_all_emb=None, batch_size=256):
                 # If using Distillation, we need to map or ensure IDs are valid.
                 # Assuming convert_bigrec_data.py handles alignment.
                 # Just strict size check:
-                mask = seq_tensor < llm_all_emb.size(0)
-                llm_emb[mask] = llm_all_emb[seq_tensor[mask]]
+
+                # mask = seq_tensor < llm_all_emb.size(0)
+                # llm_emb[mask] = llm_all_emb[seq_tensor[mask]]
+
+                mask = seq_tensor < seq_tensor <= llm_all_emb.size(0)
+                valid_ids = seq_tensor[mask] - 1
+                llm_emb[mask] = llm_all_emb[valid_ids]
+                
+
                 llm_emb = llm_emb.to(device)
             else:
                 llm_emb = None
@@ -392,8 +399,13 @@ def myevaluate_train(model, train_data, device, llm_all_emb=None, batch_size=256
                 # The original code used `seq < llm_all_emb.size(0)` which is correct.
                 # The `llm_emb` tensor should be initialized with zeros.
                 llm_emb = torch.zeros(seq_tensor.size(0), seq_tensor.size(1), llm_dim, dtype=llm_all_emb.dtype, device=device)
-                mask = seq_tensor < llm_all_emb.size(0)
-                llm_emb[mask] = llm_all_emb[seq_tensor[mask]]
+                # mask = seq_tensor < llm_all_emb.size(0)
+                # llm_emb[mask] = llm_all_emb[seq_tensor[mask]]
+
+                mask = (seq_tensor > 0) & (seq_tensor <= llm_all_emb.size(0))
+                valid_ids = seq_tensor[mask] - 1
+                llm_emb[mask] = llm_all_emb[valid_ids]
+
                 llm_emb = llm_emb.to(device)
             else:
                 llm_emb = None
