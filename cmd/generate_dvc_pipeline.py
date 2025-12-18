@@ -91,11 +91,15 @@ def generate_pipeline(csv_path):
             prompt_arg = template if template else ""
             
             if bigrec_train_stage_name not in dvc_stages:
-                dvc_stages[bigrec_train_stage_name] = {
-                    "cmd": f"OUTPUT_DIR={bigrec_train_dir} ./cmd/run_bigrec_train.sh {dataset} {gpu_id} {seed} -1 128 16 {base_model} 50 \"{prompt_arg}\" \"{al_file}\"",
-                    "deps": ["cmd/run_bigrec_train.sh", al_file],
-                    "outs": [bigrec_train_dir] 
-                }
+                if sample_num == 0:
+                     # Skip training
+                     pass
+                else:
+                    dvc_stages[bigrec_train_stage_name] = {
+                        "cmd": f"OUTPUT_DIR={bigrec_train_dir} ./cmd/run_bigrec_train.sh {dataset} {gpu_id} {seed} -1 128 16 {base_model} 50 \"{prompt_arg}\" \"{al_file}\"",
+                        "deps": ["cmd/run_bigrec_train.sh", al_file],
+                        "outs": [bigrec_train_dir] 
+                    }
 
             # === Step 4: BIGRec Inference ===
             bigrec_infer_dir = f"{exp_root}/{safe_base_model}/bigrec_infer_train/{al_suffix}"
@@ -104,11 +108,21 @@ def generate_pipeline(csv_path):
             sasrec_res_path = sasrec_dir 
             
             if bigrec_infer_stage_name not in dvc_stages:
-                dvc_stages[bigrec_infer_stage_name] = {
-                    "cmd": f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data train.json --correction ci --resource {sasrec_res_path} --lora_weights {bigrec_train_dir}",
-                    "deps": [bigrec_train_dir, sasrec_dir, "cmd/run_bigrec_inference_vllm.sh"],
-                    "outs": [f"{bigrec_infer_dir}/train_epoch_best.json"] 
-                }
+                if sample_num == 0:
+                     # Vanilla Mode
+                     bigrec_infer_out = f"{bigrec_infer_dir}/train_vanilla.json"
+                     # Deps exclude train dir
+                     dvc_stages[bigrec_infer_stage_name] = {
+                        "cmd": f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data all --correction ci --resource {sasrec_res_path} --no_adapter",
+                        "deps": [sasrec_dir, "cmd/run_bigrec_inference_vllm.sh"],
+                        "outs": [bigrec_infer_out] 
+                    }
+                else:
+                    dvc_stages[bigrec_infer_stage_name] = {
+                        "cmd": f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data all --correction ci --resource {sasrec_res_path} --lora_weights {bigrec_train_dir}",
+                        "deps": [bigrec_train_dir, sasrec_dir, "cmd/run_bigrec_inference_vllm.sh"],
+                        "outs": [f"{bigrec_infer_dir}/train_epoch_best.json"] 
+                    }
                 
             # === Step 5: DLLM2Rec Training ===
             dllm2rec_dir = f"{exp_root}/{safe_base_model}/dllm2rec_final/{al_suffix}/ed_{ed_weight}_lam_{lam}"
@@ -119,8 +133,17 @@ def generate_pipeline(csv_path):
             confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
             
             if dllm2rec_stage_name not in dvc_stages:
+                if sample_num == 0:
+                    ranking_path = f"{bigrec_infer_dir}/train_vanilla_rank.txt"
+                    confidence_path = f"{bigrec_infer_dir}/train_vanilla_score.txt"
+                    epoch_arg = "vanilla"
+                else:
+                    ranking_path = f"{bigrec_infer_dir}/train_epoch_best_rank.txt"
+                    confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
+                    epoch_arg = "best"
+                    
                 dvc_stages[dllm2rec_stage_name] = {
-                    "cmd": f"OUTPUT_DIR={dllm2rec_dir} RANKING_PATH={ranking_path} CONFIDENCE_PATH={confidence_path} EMBEDDING_PATH={embedding_path} ./cmd/run_dllm2rec_train.sh {dataset} SASRec {gpu_id} {ed_weight} {lam}",
+                    "cmd": f"OUTPUT_DIR={dllm2rec_dir} RANKING_PATH={ranking_path} CONFIDENCE_PATH={confidence_path} EMBEDDING_PATH={embedding_path} ./cmd/run_dllm2rec_train.sh {dataset} SASRec {gpu_id} {ed_weight} {lam} '' {seed} 1024 {epoch_arg}",
                     "deps": [ranking_path, confidence_path, "cmd/run_dllm2rec_train.sh"],
                     "outs": [f"{dllm2rec_dir}/metrics.json"]
                 }

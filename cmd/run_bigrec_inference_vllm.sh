@@ -40,6 +40,7 @@ usage() {
     echo "  --resource <path>        Path to correction resource (CI dir or Pop file)"
     echo "  --gamma <float>          Manual gamma override (default: auto/grid-search)"
     echo "  --batch_size <int>       Batch size for evaluation (default: 16)"
+    echo "  --no_adapter             Run without adapter (vanilla mode)"
     echo "  -h, --help               Show this help message and exit"
     exit 1
 }
@@ -62,6 +63,7 @@ while [[ "$#" -gt 0 ]]; do
         --correction) CORRECTION_MODE="$2"; shift ;;
         --resource) CORRECTION_RESOURCE="$2"; shift ;;
         --lora_weights) LORA_WEIGHTS="$2"; shift ;;
+        --no_adapter) USE_ADAPTER="false" ;;
         --gamma) MANUAL_GAMMA="$2"; shift ;;
         -h|--help) usage ;;
         *) echo "Unknown parameter passed: $1"; usage ;;
@@ -89,62 +91,68 @@ DATA_DIR="BIGRec/data/$DATASET"
 
 # Construct LoRA weights path
 # Construct LoRA weights path
-if [ -n "$LORA_WEIGHTS" ]; then
-    BASE_LORA_PATH="$LORA_WEIGHTS"
+if [ "$USE_ADAPTER" = "false" ]; then
+    echo "DEBUG: Running in NO ADAPTER (Vanilla) mode."
+    LORA_WEIGHTS=""
+    EPOCH_SUFFIX="_vanilla"
 else
-    BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
-    LORA_WEIGHTS="$BASE_LORA_PATH"
-fi
-EPOCH_SUFFIX="_epoch_best" # Default suffix
-
-# Check for specific checkpoint
-if [ -d "$BASE_LORA_PATH" ]; then
-    if [ "$CHECKPOINT_EPOCH" == "best" ]; then
-        BEST_MODEL=$(find "$BASE_LORA_PATH" -maxdepth 1 -type d -name "best_model_epoch_*" | sort -V | tail -n 1)
-        if [ -n "$BEST_MODEL" ]; then
-            echo "Found Best Model checkpoint: $BEST_MODEL"
-            LORA_WEIGHTS="$BEST_MODEL"
-            EPOCH_SUFFIX="_epoch_best"
-        else
-            echo "Error: No best model checkpoint (best_model_epoch_*) found in $BASE_LORA_PATH"
-            exit 1
-        fi
+    if [ -n "$LORA_WEIGHTS" ]; then
+        BASE_LORA_PATH="$LORA_WEIGHTS"
     else
-        TARGET_EPOCH="$CHECKPOINT_EPOCH"
-        EPOCH_SUFFIX="_epoch${TARGET_EPOCH}"
-        SPECIFIC_BEST="${BASE_LORA_PATH}/best_model_epoch_${TARGET_EPOCH}"
-        if [ -d "$SPECIFIC_BEST" ]; then
-             echo "Found specified epoch in best model: $SPECIFIC_BEST"
-             LORA_WEIGHTS="$SPECIFIC_BEST"
+        BASE_LORA_PATH="BIGRec/model/$DATASET/${SAFE_MODEL_NAME}/${SEED}_${SAMPLE}"
+        LORA_WEIGHTS="$BASE_LORA_PATH"
+    fi
+    EPOCH_SUFFIX="_epoch_best" # Default suffix
+
+    # Check for specific checkpoint
+    if [ -d "$BASE_LORA_PATH" ]; then
+        if [ "$CHECKPOINT_EPOCH" == "best" ]; then
+            BEST_MODEL=$(find "$BASE_LORA_PATH" -maxdepth 1 -type d -name "best_model_epoch_*" | sort -V | tail -n 1)
+            if [ -n "$BEST_MODEL" ]; then
+                echo "Found Best Model checkpoint: $BEST_MODEL"
+                LORA_WEIGHTS="$BEST_MODEL"
+                EPOCH_SUFFIX="_epoch_best"
+            else
+                echo "Error: No best model checkpoint (best_model_epoch_*) found in $BASE_LORA_PATH"
+                exit 1
+            fi
         else
-             FOUND_CHECKPOINT=""
-             echo "Searching for epoch $TARGET_EPOCH in checkpoints..."
-             
-             for d in "$BASE_LORA_PATH"/checkpoint-*; do
-                 if [ -d "$d" ]; then
-                     STATE_FILE="$d/trainer_state.json"
-                     if [ -f "$STATE_FILE" ]; then
-                         CHECK_EPOCH=$(python -c "import json; 
+            TARGET_EPOCH="$CHECKPOINT_EPOCH"
+            EPOCH_SUFFIX="_epoch${TARGET_EPOCH}"
+            SPECIFIC_BEST="${BASE_LORA_PATH}/best_model_epoch_${TARGET_EPOCH}"
+            if [ -d "$SPECIFIC_BEST" ]; then
+                 echo "Found specified epoch in best model: $SPECIFIC_BEST"
+                 LORA_WEIGHTS="$SPECIFIC_BEST"
+            else
+                 FOUND_CHECKPOINT=""
+                 echo "Searching for epoch $TARGET_EPOCH in checkpoints..."
+                 
+                 for d in "$BASE_LORA_PATH"/checkpoint-*; do
+                     if [ -d "$d" ]; then
+                         STATE_FILE="$d/trainer_state.json"
+                         if [ -f "$STATE_FILE" ]; then
+                             CHECK_EPOCH=$(python -c "import json; 
 try:
     with open('$STATE_FILE') as f: data = json.load(f); 
     print(data.get('epoch', -1))
 except: print(-1)")
-                         IS_MATCH=$(python -c "print(1 if abs(float('$CHECK_EPOCH') - float('$TARGET_EPOCH')) < 0.001 else 0)")
-                         if [ "$IS_MATCH" -eq 1 ]; then
-                             FOUND_CHECKPOINT="$d"
-                             break
+                             IS_MATCH=$(python -c "print(1 if abs(float('$CHECK_EPOCH') - float('$TARGET_EPOCH')) < 0.001 else 0)")
+                             if [ "$IS_MATCH" -eq 1 ]; then
+                                 FOUND_CHECKPOINT="$d"
+                                 break
+                             fi
                          fi
                      fi
+                 done
+                 
+                 if [ -n "$FOUND_CHECKPOINT" ]; then
+                      echo "Found checkpoint for epoch $TARGET_EPOCH: $FOUND_CHECKPOINT"
+                      LORA_WEIGHTS="$FOUND_CHECKPOINT"
+                 else
+                      echo "Error: Could not find checkpoint for epoch $TARGET_EPOCH in $BASE_LORA_PATH"
+                      exit 1
                  fi
-             done
-             
-             if [ -n "$FOUND_CHECKPOINT" ]; then
-                  echo "Found checkpoint for epoch $TARGET_EPOCH: $FOUND_CHECKPOINT"
-                  LORA_WEIGHTS="$FOUND_CHECKPOINT"
-             else
-                  echo "Error: Could not find checkpoint for epoch $TARGET_EPOCH in $BASE_LORA_PATH"
-                  exit 1
-             fi
+            fi
         fi
     fi
 fi
@@ -174,11 +182,15 @@ fi
 mkdir -p "$RESULT_DIR"
 
 # Check LoRA
-if [ ! -d "$LORA_WEIGHTS" ]; then
-    echo "Error: LoRA weights not found at $LORA_WEIGHTS"
-    exit 1
+if [ "$USE_ADAPTER" != "false" ]; then
+    if [ ! -d "$LORA_WEIGHTS" ]; then
+        echo "Error: LoRA weights not found at $LORA_WEIGHTS"
+        exit 1
+    fi
+    echo "Using LoRA weights from: $LORA_WEIGHTS"
+else
+     echo "Using Vanilla Base Model (No Adapter)"
 fi
-echo "Using LoRA weights from: $LORA_WEIGHTS"
 echo "Outputting results to: $RESULT_DIR"
 
 # Configure Embedding Model

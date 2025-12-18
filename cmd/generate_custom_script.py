@@ -93,30 +93,34 @@ def generate_bash_pipeline(csv_path):
                 # === Step 3: BIGRec Training ===
                 bigrec_train_dir = f"{exp_root}/{safe_base_model}/bigrec_train/{al_suffix}"
                 prompt_arg = f"templates/{template}" if template else ""
-                # run_bigrec_train.sh creates the directory, so we check directory existence or a specific file inside?
-                # Usually checking the directory is safer if the script handles resume or overwrite. 
-                # But here we want to skip if DONE. Directory might exist but be empty if failed?
-                # Let's check for "adapter_model.bin" or just the dir if we assume atomic success?
-                # User asked "if output exists".
-                # Let's check the dir.
                 
                 bigrec_train_cmd = f"OUTPUT_DIR={bigrec_train_dir} ./cmd/run_bigrec_train.sh {dataset} {gpu_id} {seed} -1 128 16 {base_model} 50 \"{prompt_arg}\" \"{al_file}\""
 
                 f.write(f"\n# --- Step 3: BIGRec Train ---\n")
-                f.write(f"if [ -d \"{bigrec_train_dir}\" ] && [ \"$(ls -A {bigrec_train_dir})\" ]; then\n")
-                f.write(f"    echo \"Skipping BIGRec Train (Output dir exists and not empty: {bigrec_train_dir})\"\n")
-                f.write(f"else\n")
-                f.write(f"    echo \"Running BIGRec Train...\"\n")
-                f.write(f"    {bigrec_train_cmd}\n")
-                f.write(f"fi\n")
+                if sample_num == 0:
+                    f.write(f"echo \"Skipping BIGRec Train (Vanilla Mode: sample_num=0)\"\n")
+                else:
+                    f.write(f"if [ -d \"{bigrec_train_dir}\" ] && [ \"$(ls -A {bigrec_train_dir})\" ]; then\n")
+                    f.write(f"    echo \"Skipping BIGRec Train (Output dir exists and not empty: {bigrec_train_dir})\"\n")
+                    f.write(f"else\n")
+                    f.write(f"    echo \"Running BIGRec Train...\"\n")
+                    f.write(f"    {bigrec_train_cmd}\n")
+                    f.write(f"fi\n")
 
                 # === Step 4: BIGRec Inference ===
                 bigrec_infer_dir = f"{exp_root}/{safe_base_model}/bigrec_infer_train/{al_suffix}"
                 sasrec_res_path = sasrec_dir 
-                # Output file needed for next step
-                bigrec_infer_out = f"{bigrec_infer_dir}/train_epoch_best.json"
                 
-                bigrec_infer_cmd = f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data all --correction ci --resource {sasrec_res_path} --lora_weights {bigrec_train_dir}"
+                if sample_num == 0:
+                     # Vanilla Mode: No adapter, result filename changes
+                     bigrec_infer_out = f"{bigrec_infer_dir}/train_vanilla.json"
+                     # Add --no_adapter, Remove lora_weights (or pass empty/dummy if logic handles it, but better explicit)
+                     # Shell script handles --no_adapter which implies empty lora.
+                     # But we must construct command carefully.
+                     bigrec_infer_cmd = f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data all --correction ci --resource {sasrec_res_path} --no_adapter"
+                else:
+                     bigrec_infer_out = f"{bigrec_infer_dir}/train_epoch_best.json"
+                     bigrec_infer_cmd = f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data all --correction ci --resource {sasrec_res_path} --lora_weights {bigrec_train_dir}"
 
                 f.write(f"\n# --- Step 4: BIGRec Inference ---\n")
                 f.write(f"if [ -e \"{bigrec_infer_out}\" ]; then\n")
@@ -129,11 +133,19 @@ def generate_bash_pipeline(csv_path):
                 # === Step 5: DLLM2Rec Training ===
                 dllm2rec_dir = f"{exp_root}/{safe_base_model}/dllm2rec_final/{al_suffix}/ed_{ed_weight}_lam_{lam}"
                 embedding_path = f"BIGRec/data/{dataset}/model_embeddings/{safe_base_model}.pt" 
-                ranking_path = f"{bigrec_infer_dir}/train_epoch_best_rank.txt"
-                confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
+                
+                if sample_num == 0:
+                     ranking_path = f"{bigrec_infer_dir}/train_vanilla_rank.txt"
+                     confidence_path = f"{bigrec_infer_dir}/train_vanilla_score.txt"
+                     epoch_arg = "vanilla"
+                else:
+                     ranking_path = f"{bigrec_infer_dir}/train_epoch_best_rank.txt"
+                     confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
+                     epoch_arg = "best"
+                     
                 dllm2rec_out = f"{dllm2rec_dir}/metrics.json"
 
-                dllm2rec_cmd = f"OUTPUT_DIR={dllm2rec_dir} RANKING_PATH={ranking_path} CONFIDENCE_PATH={confidence_path} EMBEDDING_PATH={embedding_path} ./cmd/run_dllm2rec_train.sh {dataset} SASRec {gpu_id} {ed_weight} {lam}"
+                dllm2rec_cmd = f"OUTPUT_DIR={dllm2rec_dir} RANKING_PATH={ranking_path} CONFIDENCE_PATH={confidence_path} EMBEDDING_PATH={embedding_path} ./cmd/run_dllm2rec_train.sh {dataset} SASRec {gpu_id} {ed_weight} {lam} '' {seed} 1024 {epoch_arg}"
 
                 f.write(f"\n# --- Step 5: DLLM2Rec Train ---\n")
                 f.write(f"if [ -e \"{dllm2rec_out}\" ]; then\n")

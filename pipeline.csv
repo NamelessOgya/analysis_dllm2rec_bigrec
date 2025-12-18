@@ -15,3 +15,11 @@ game_bigrec,0,0.5,random,10000,0.5,google/gemma-2B-it,prompt_template_gemma.txt,
 game_bigrec,1,0.5,random,10000,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
 game_bigrec,2,0.5,random,10000,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
 game_bigrec,3,0.5,random,10000,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
+game_bigrec,0,0.5,random,0,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
+game_bigrec,1,0.5,random,0,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
+game_bigrec,2,0.5,random,0,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
+game_bigrec,3,0.5,random,0,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
+game_bigrec,0,0.5,random,16,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
+game_bigrec,1,0.5,random,16,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1
+game_bigrec,2,0.5,random,16,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,0
+game_bigrec,3,0.5,random,16,0.5,google/gemma-2B-it,prompt_template_gemma.txt,0.3,0.7,1

@@ -16,6 +16,8 @@ BIGREC_EPOCH=${9:-"best"}
 
 if [ "$BIGREC_EPOCH" == "best" ]; then
     BIGREC_EPOCH_SUFFIX="_epoch_best"
+elif [ "$BIGREC_EPOCH" == "none" ] || [ "$BIGREC_EPOCH" == "vanilla" ]; then
+    BIGREC_EPOCH_SUFFIX="_vanilla"
 else
     BIGREC_EPOCH_SUFFIX="_epoch${BIGREC_EPOCH}"
 fi
