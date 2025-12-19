@@ -15,12 +15,7 @@ else
 fi
 
 # --- Step 2: AL Data ---
-if [ -e "${REPO_ROOT}/experiments/game_bigrec/active_learning/random_0_0.5_seed_99_alpha_0.5.json" ]; then
-    echo "Skipping AL Data Gen (Output exists: ${REPO_ROOT}/experiments/game_bigrec/active_learning/random_0_0.5_seed_99_alpha_0.5.json)"
-else
-    echo "Running AL Data Gen..."
-    OUTPUT_JSON=${REPO_ROOT}/experiments/game_bigrec/active_learning/random_0_0.5_seed_99_alpha_0.5.json ./cmd/create_active_learning_data.sh game_bigrec random 0 0.5 99 1024 
-fi
+echo "Skipping AL Data Gen (Vanilla Mode: sample_num=0)"
 
 # --- Step 3: BIGRec Train ---
 echo "Skipping BIGRec Train (Vanilla Mode: sample_num=0)"

@@ -19,6 +19,7 @@ DLLM2Rec/tocf/dummy_data/
 BIGRec/model/
 BIGRec/data/*/*.json
 BIGRec/data/*/id2name.txt
+**/item_map.txt
 DLLM2Rec/data/game_bigrec/
 
 # User requested ignores

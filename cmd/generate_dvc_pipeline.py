@@ -78,11 +78,14 @@ def generate_pipeline(csv_path):
             al_stage_name = f"al_data_{sanitize(al_suffix)}_{suffix_gpu}"
             
             if al_stage_name not in dvc_stages:
-                dvc_stages[al_stage_name] = {
-                    "cmd": f"OUTPUT_JSON={al_file} ./cmd/create_active_learning_data.sh {dataset} {strategy} {sample_num} {al_ratio} {seed} 1024 {dros_source_arg}",
-                    "deps": deps_al,
-                    "outs": [al_file]
-                }
+                if sample_num == 0:
+                    pass
+                else: 
+                    dvc_stages[al_stage_name] = {
+                        "cmd": f"OUTPUT_JSON={al_file} ./cmd/create_active_learning_data.sh {dataset} {strategy} {sample_num} {al_ratio} {seed} 1024 {dros_source_arg}",
+                        "deps": deps_al,
+                        "outs": [al_file]
+                    }
                 
             # === Step 3: BIGRec Training ===
             bigrec_train_dir = f"{exp_root}/{safe_base_model}/bigrec_train/{al_suffix}"

@@ -82,13 +82,18 @@ def generate_bash_pipeline(csv_path):
                 al_file = f"{exp_root}/active_learning/{al_suffix}.json"
                 al_cmd = f"OUTPUT_JSON={al_file} ./cmd/create_active_learning_data.sh {dataset} {strategy} {sample_num} {al_ratio} {seed} 1024 {dros_source_arg}"
 
-                f.write(f"\n# --- Step 2: AL Data ---\n")
-                f.write(f"if [ -e \"{al_file}\" ]; then\n")
-                f.write(f"    echo \"Skipping AL Data Gen (Output exists: {al_file})\"\n")
-                f.write(f"else\n")
-                f.write(f"    echo \"Running AL Data Gen...\"\n")
-                f.write(f"    {al_cmd}\n")
-                f.write(f"fi\n")
+                # === Step 2: AL Data ===
+                if sample_num == 0:
+                    f.write(f"\n# --- Step 2: AL Data ---\n")
+                    f.write(f"echo \"Skipping AL Data Gen (Vanilla Mode: sample_num=0)\"\n")
+                else:
+                    f.write(f"\n# --- Step 2: AL Data ---\n")
+                    f.write(f"if [ -e \"{al_file}\" ]; then\n")
+                    f.write(f"    echo \"Skipping AL Data Gen (Output exists: {al_file})\"\n")
+                    f.write(f"else\n")
+                    f.write(f"    echo \"Running AL Data Gen...\"\n")
+                    f.write(f"    {al_cmd}\n")
+                    f.write(f"fi\n")
                 
                 # === Step 3: BIGRec Training ===
                 bigrec_train_dir = f"{exp_root}/{safe_base_model}/bigrec_train/{al_suffix}"
