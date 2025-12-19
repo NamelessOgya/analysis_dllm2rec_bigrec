@@ -244,7 +244,7 @@ elif args.validation_file:
             if valid_dist.shape != ci_norm_val.shape:
                 raise ValueError(f"CRITICAL ERROR: Shape mismatch for CI tuning. Dist: {valid_dist.shape}, CI: {ci_norm_val.shape}. Ensure val.pt matches valid.json.")
             else:
-                search_gammas_ci = [x/10.0 for x in range(0, 50)] + [i for i in range(5, 20)] # 0.0-5.0 step 0.1, 5-20 step 1
+                search_gammas_ci = [(x + 1) / 100.0 for x in range(100)] + [x for x in range(1, 100)] # 0.01-1.00 step 0.01, 1-99 step 1 (Official implementation)
                 
                 best_ci_ndcg = -1.0
                 
