@@ -113,7 +113,7 @@ def generate_pipeline(csv_path):
             if bigrec_infer_stage_name not in dvc_stages:
                 if sample_num == 0:
                      # Vanilla Mode
-                     bigrec_infer_out = f"{bigrec_infer_dir}/train_vanilla.json"
+                     bigrec_infer_out = f"{bigrec_infer_dir}/train_epoch_best.json"
                      # Deps exclude train dir
                      dvc_stages[bigrec_infer_stage_name] = {
                         "cmd": f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data all --correction ci --resource {sasrec_res_path} --no_adapter",
@@ -136,14 +136,9 @@ def generate_pipeline(csv_path):
             confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
             
             if dllm2rec_stage_name not in dvc_stages:
-                if sample_num == 0:
-                    ranking_path = f"{bigrec_infer_dir}/train_vanilla_rank.txt"
-                    confidence_path = f"{bigrec_infer_dir}/train_vanilla_score.txt"
-                    epoch_arg = "vanilla"
-                else:
-                    ranking_path = f"{bigrec_infer_dir}/train_epoch_best_rank.txt"
-                    confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
-                    epoch_arg = "best"
+                ranking_path = f"{bigrec_infer_dir}/train_epoch_best_rank.txt"
+                confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
+                epoch_arg = "best"
                     
                 dvc_stages[dllm2rec_stage_name] = {
                     "cmd": f"OUTPUT_DIR={dllm2rec_dir} RANKING_PATH={ranking_path} CONFIDENCE_PATH={confidence_path} EMBEDDING_PATH={embedding_path} ./cmd/run_dllm2rec_train.sh {dataset} SASRec {gpu_id} {ed_weight} {lam} '' {seed} 1024 {epoch_arg}",

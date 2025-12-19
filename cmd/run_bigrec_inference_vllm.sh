@@ -94,7 +94,7 @@ DATA_DIR="BIGRec/data/$DATASET"
 if [ "$USE_ADAPTER" = "false" ]; then
     echo "DEBUG: Running in NO ADAPTER (Vanilla) mode."
     LORA_WEIGHTS=""
-    EPOCH_SUFFIX="_vanilla"
+    EPOCH_SUFFIX="_epoch_best"
 else
     if [ -n "$LORA_WEIGHTS" ]; then
         BASE_LORA_PATH="$LORA_WEIGHTS"

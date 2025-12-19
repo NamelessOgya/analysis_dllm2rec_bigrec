@@ -117,11 +117,9 @@ def generate_bash_pipeline(csv_path):
                 sasrec_res_path = sasrec_dir 
                 
                 if sample_num == 0:
-                     # Vanilla Mode: No adapter, result filename changes
-                     bigrec_infer_out = f"{bigrec_infer_dir}/train_vanilla.json"
-                     # Add --no_adapter, Remove lora_weights (or pass empty/dummy if logic handles it, but better explicit)
-                     # Shell script handles --no_adapter which implies empty lora.
-                     # But we must construct command carefully.
+                     # Vanilla Mode: No adapter, but using standard naming
+                     bigrec_infer_out = f"{bigrec_infer_dir}/train_epoch_best.json"
+                     # Add --no_adapter
                      bigrec_infer_cmd = f"RESULT_DIR={bigrec_infer_dir} ./cmd/run_bigrec_inference_vllm.sh --dataset {dataset} --gpu {gpu_id} --model {base_model} --seed {seed} --sample -1 --checkpoint best --test_data all --correction ci --resource {sasrec_res_path} --no_adapter"
                 else:
                      bigrec_infer_out = f"{bigrec_infer_dir}/train_epoch_best.json"
@@ -139,14 +137,14 @@ def generate_bash_pipeline(csv_path):
                 dllm2rec_dir = f"{exp_root}/{safe_base_model}/dllm2rec_final/{al_suffix}/ed_{ed_weight}_lam_{lam}"
                 embedding_path = f"BIGRec/data/{dataset}/model_embeddings/{safe_base_model}.pt" 
                 
-                if sample_num == 0:
-                     ranking_path = f"{bigrec_infer_dir}/train_vanilla_rank.txt"
-                     confidence_path = f"{bigrec_infer_dir}/train_vanilla_score.txt"
-                     epoch_arg = "vanilla"
-                else:
-                     ranking_path = f"{bigrec_infer_dir}/train_epoch_best_rank.txt"
-                     confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
-                     epoch_arg = "best"
+                ranking_path = f"{bigrec_infer_dir}/train_epoch_best_rank.txt"
+                confidence_path = f"{bigrec_infer_dir}/train_epoch_best_score.txt"
+                epoch_arg = "best"
+                
+                # if sample_num == 0, epoch_arg was "vanilla", but now we standardized suffix to _epoch_best.
+                # run_dllm2rec_train.sh with "best" uses "_epoch_best" suffix. 
+                # So we can unify.
+                # Just confirm epoch_arg="best" works for vanilla pipeline logic if filename matches. Yes.
                      
                 dllm2rec_out = f"{dllm2rec_dir}/metrics.json"
 
